@@ -1,29 +1,51 @@
 import "./styles.css";
+import { startBoard } from "./bt/board";
 
-/** Off the clock: the strip is plain HTML; this adds the arrows and the full-size viewer. */
+/**
+ * The page works as plain HTML: the tree is a nested list, the blackboard a list of
+ * numbers. The board (cards on a camera) starts right away and needs no WebGL;
+ * three.js comes in afterwards, once the page is idle, to draw the board itself.
+ */
+const board = startBoard();
+
+async function loadLayer() {
+  if (!board) return;
+  const canvas = document.querySelector<HTMLCanvasElement>("canvas.gl");
+  if (!canvas) return;
+  const mobile = matchMedia("(pointer: coarse)").matches || innerWidth < 900;
+  let gl = false;
+  try {
+    gl = !!document.createElement("canvas").getContext("webgl2");
+  } catch {
+    gl = false;
+  }
+  if (gl) {
+    const { createGL } = await import("./bt/gl");
+    const layer = createGL(canvas, mobile);
+    if (layer) return board.attach(layer);
+  }
+  const { createFlat } = await import("./bt/flat");
+  const flat = createFlat(canvas, mobile);
+  if (flat) board.attach(flat);
+}
+
+/** Photos open full size; arrow keys step through them. */
 function wirePhotos() {
-  const strip = document.querySelector<HTMLElement>(".strip")!;
-  const links = Array.from(strip.querySelectorAll<HTMLAnchorElement>("a[data-caption]"));
-
-  // the arrows step a frame at a time
-  document.querySelectorAll<HTMLButtonElement>(".strip-nav button").forEach((b) =>
-    b.addEventListener("click", () => {
-      const fig = strip.querySelector("figure");
-      const step = fig ? fig.getBoundingClientRect().width + 16 : 400;
-      strip.scrollBy({ left: Number(b.dataset.dir) * step, behavior: "smooth" });
-    }),
-  );
-
-  const viewer = document.querySelector<HTMLDialogElement>(".viewer")!;
-  const img = viewer.querySelector("img")!;
+  const links = Array.from(document.querySelectorAll<HTMLAnchorElement>(".gallery a[data-caption]"));
+  const viewer = document.querySelector<HTMLDialogElement>("dialog.viewer");
+  if (!viewer) return;
+  const media = viewer.querySelector(".viewer-media")!;
   const cap = viewer.querySelector(".viewer-cap")!;
-  let current = 0;
+  let current = -1;
   const show = (i: number) => {
     current = (i + links.length) % links.length;
     const a = links[current];
+    media.innerHTML = "";
+    const img = document.createElement("img");
     img.src = a.href;
-    img.alt = a.querySelector("img")!.alt;
-    cap.textContent = a.dataset.caption!;
+    img.alt = a.querySelector("img")?.alt ?? "";
+    media.append(img);
+    cap.textContent = a.dataset.caption ?? "";
   };
   links.forEach((a, i) =>
     a.addEventListener("click", (e) => {
@@ -37,53 +59,22 @@ function wirePhotos() {
   viewer.addEventListener("click", (e) => {
     if (e.target === viewer) viewer.close();
   });
+  viewer.addEventListener("close", () => {
+    current = -1;
+    media.querySelector("video")?.pause();
+    media.innerHTML = "";
+  });
   viewer.addEventListener("keydown", (e) => {
+    if (current < 0) return;
     if (e.key === "ArrowRight") show(current + 1);
     if (e.key === "ArrowLeft") show(current - 1);
   });
 }
 
-/** Clips play only while you can see them, and not at all if you've asked for less motion. */
-function wireVideos() {
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const videos = document.querySelectorAll<HTMLVideoElement>(".card video");
-  if (reduced) {
-    videos.forEach((v) => {
-      v.parentElement!.addEventListener("pointerenter", () => v.play().catch(() => {}));
-      v.parentElement!.addEventListener("pointerleave", () => v.pause());
-    });
-    return;
-  }
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const en of entries) {
-        const v = en.target as HTMLVideoElement;
-        if (en.isIntersecting) v.play().catch(() => {});
-        else v.pause();
-      }
-    },
-    { threshold: 0.6 },
-  );
-  videos.forEach((v) => io.observe(v));
-}
-
-/** The 3D is a layer on top of a page that already works; load it once the page is up. */
-async function loadSwarm() {
-  const canvas = document.getElementById("swarm") as HTMLCanvasElement;
-  const probe = document.createElement("canvas").getContext("webgl2");
-  if (!probe) return;
-  await Promise.all([
-    document.fonts.load('700 100px "Geist Variable"'),
-    document.fonts.load('italic 400 100px "Instrument Serif"'),
-  ]).catch(() => {});
-  const { startSwarm } = await import("./swarm");
-  startSwarm(canvas);
-}
-
-/** The nav marks the section you're in. */
+/** The bar marks the section you're in. */
 function wireNav() {
   const links = new Map(
-    Array.from(document.querySelectorAll<HTMLAnchorElement>(".nav nav a")).map((a) => [a.hash.slice(1), a]),
+    Array.from(document.querySelectorAll<HTMLAnchorElement>(".bar nav a")).map((a) => [a.hash.slice(1), a]),
   );
   const io = new IntersectionObserver(
     (entries) => {
@@ -102,6 +93,6 @@ function wireNav() {
 
 wirePhotos();
 wireNav();
-wireVideos();
-const idle = (window as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback ?? ((cb) => setTimeout(cb, 1));
-idle(() => void loadSwarm());
+const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+if (idle) idle(() => void loadLayer(), { timeout: 1200 });
+else setTimeout(() => void loadLayer(), 200);

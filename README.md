@@ -1,44 +1,72 @@
-# elejeune.me — v5
+# elejeune.me — v5 · Behavior Tree
 
-A career, drawn by a swarm of drones.
+My career, as a behavior tree you can tick.
 
 ![v5](public/og.jpg)
 
-About a thousand small quadcopters flock in the hero and scatter around your
-cursor. Scroll, and they fly into a new formation for each chapter: the chip I
-started on, the maze my robots solved, the shopping cart from the supermarket
-robot, the bird behind the flocking paper, the CPU we gave back to the drones,
-a graph of agents, and a sphere for SIRB.AI — *sirb* is Arabic for a swarm.
+I build robot autonomy, and BTView, an editor for behavior trees. So the site is
+one: a light node canvas where each chapter of my life is a subtree. Scroll, and
+the tick goes out from the root. Nodes go from **Idle** (dashed) to **Running**
+(amber) to **Success** (green), the edges fill as the tick travels down them, and
+a small rover drives along the edges to whatever node is being ticked. A
+**Blackboard** panel fills with the values the nodes write (`team_size: 9`,
+`onboard_cpu: −74%`, `papers: 3`…).
 
-The words are plain HTML in their own column. The swarm never sits behind text.
+The semantics are real BehaviorTree.CPP semantics. The root is a `Parallel`
+(learning and building robots overlapped for three years), chapters are
+`Sequence`s, the research year is a `Parallel` of four projects plus a remote
+job, and conditions are the things that held (`Mapped maze solved?`). Nothing
+fails, because nothing did. Branches that are still going (SIRB.AI, Unchained
+Labs, Off the clock) stay **Running**, and the ticks keep flowing down their edges.
+
+## How you move through it
+
+- **Scroll** advances the tick, one chapter per screen. The camera glides to the
+  next subtree with a short pull-back, then holds while you read.
+- **Drag** pans the board, **pinch** or **ctrl + scroll** zooms around the cursor.
+  The camera goes back to following the tick at the next chapter, or on **Follow**.
+- **Play** runs the whole tree by itself (about a minute). **← →** step.
+  The timeline in the dock jumps to any chapter.
+- **Click** a node with a `+ Paper` badge to open it; click a clip to see it large.
 
 ## How it's built
 
-- **Page first.** `index.html` holds every word and link; it reads fine with no
-  JavaScript and no WebGL. The page's own script is under 2 KB.
-- **3D second.** three.js loads lazily once the page is idle. One instanced
-  mesh, no post-processing, no physics engine.
-- **Formations are drawings.** Each chapter's shape is drawn on a small
-  offscreen canvas (ink in black, the highlight in red) and sampled on a hex
-  grid, so drones sit evenly like a real drone show. See `src/swarm/shapes.ts`.
-- **Scroll drives it directly.** The scroll position picks the two formations
-  to blend and how far along; nothing eases the scroll itself, so the swarm
-  answers the wheel straight away. A stiff spring per drone just rounds off the
-  motion.
-- **It sleeps.** While you read the project grid the drones are parked above
-  the page and the canvas stops rendering.
-- **About 0.35 ms of CPU per frame** for the whole swarm, measured in dev.
+- **The markup is the tree.** `index.html` holds the whole BT as nested
+  `<ol>`/`<li>`, one `<article class="node">` per node, like the XML. With no
+  script it reads as an outline. Timing lives in `data-step` / `data-run` /
+  `data-ok` attributes, and the blackboard is a `<dl>`.
+- **Cards are DOM, the board is WebGL.** One camera (`src/bt/cam.ts`, pitch-only
+  perspective) projects both, so card text stays crisp HTML while the dot grid,
+  the edges, the chapter frames and the rover are three.js. Cards are anchored at
+  their input port, so edges always meet their ports to the pixel.
+- **Two layouts** (`src/bt/layout.ts`): left-to-right with ribbon-cable lanes on
+  wide screens, an indented outline on phones.
+- **three.js loads late.** The board (cards, camera, scroll, interaction) runs
+  without it; `gl.ts` is a dynamic import once the page is idle. Without WebGL a
+  2D canvas draws the same edges (`flat.ts`).
+- **Cheap to draw.** 9 draw calls, ~3.3k triangles: one shader plane for the
+  grid, one instanced mesh for all chapter frames, one ribbon mesh for every edge
+  (fill and pulses are uniforms), and the rover. No post-processing.
+  Pixel ratio capped at 2 (1.5 on touch). It stops rendering off-screen, in a
+  hidden tab, and 20 s after the last input.
+- **Measure it.** Open `/?perf` for a per-frame CPU readout; `window.__bt` has
+  the same numbers.
+- `prefers-reduced-motion`: no camera glides, no pulses, no autoplaying clips.
 
 ## Structure
 
 ```
-index.html            all the content
-src/main.ts           photo viewer, clips that play in view, nav state, lazy-loads the swarm
-src/styles.css        the design system: paper, ink, one orange
-src/swarm/index.ts    renderer, drones, scroll → formation blend, cursor
-src/swarm/shapes.ts   the formations
-public/work/          project clips (960px, 30 s loops) and posters
-public/photos/        twelve photos at 800 and 1600px
+index.html          the tree (content), blackboard, notes, photos, contact
+src/main.ts         boots the board, lazy-loads the renderer, photo viewer, nav
+src/styles.css      the look: cool canvas, white nodes, amber running, green success
+src/bt/model.ts     reads the tree from the DOM, times every status change
+src/bt/layout.ts    the two layouts, edge routing, the rover's routes
+src/bt/cam.ts       the shared camera (projection, unprojection)
+src/bt/board.ts     scroll → tick, camera shots, cards, blackboard, dock, input
+src/bt/gl.ts        three.js: grid, frames, edges, rover
+src/bt/flat.ts      2D-canvas fallback when there is no WebGL
+public/work/        project clips (960px, 30 s loops) and posters
+public/photos/      twelve photos at 800 and 1600px
 ```
 
 ## Commands
@@ -52,19 +80,8 @@ public/photos/        twelve photos at 800 and 1600px
 
 ## Editing
 
-- **Words, links, projects, photos** — `index.html`.
-- **A new chapter** — add an `<article class="chapter stage" data-stage="name">`
-  and a matching drawing in `buildFormations()` in `src/swarm/shapes.ts`.
-- **Clips** — re-encode new ones the same way:
-  `ffmpeg -i in.mp4 -t 30 -an -vf "scale='min(960,iw)':-2,fps=30" -c:v libx264 -preset slow -crf 30 -pix_fmt yuv420p -movflags +faststart out.mp4`
-
-## Accessibility
-
-- Reduced motion: the swarm only moves when you scroll — no flocking, no arcs; clips only play on hover.
-- The canvas is `aria-hidden` and never takes pointer events.
-- Photos open in a native `<dialog>`; arrow keys step through them.
-
-## Deploying
-
-Static output — `npm run build` and serve `dist/`. On Vercel, import the repo;
-Vite is detected with no configuration.
+- **Words, links, projects** — the nodes in `index.html`.
+- **A new chapter** — add an `<li>` with an `<article class="node node--chapter"
+  data-type="sequence" data-step="N">` and its children; children are timed
+  from their parent's type. Add a matching button to `.ticks` in the dock.
+- **A blackboard value** — a `<div data-at="progress" data-key="…">` in `.bb-list`.

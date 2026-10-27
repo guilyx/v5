@@ -6,447 +6,701 @@
     <title>Erwin Lejeune — Head of Robotics</title>
     <meta
       name="description"
-      content="Erwin Lejeune builds robots that work as a team. Head of Robotics at SIRB.AI in Abu Dhabi — eight years of autonomy, from one maze robot to drone swarms."
+      content="Erwin Lejeune, Head of Robotics at SIRB.AI in Abu Dhabi. Eight years in robotics, told as a behavior tree you can tick."
     />
-    <meta name="theme-color" content="#f3f0e8" />
+    <meta name="theme-color" content="#f3f5f8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Erwin Lejeune — Head of Robotics" />
-    <meta property="og:description" content="I build robots that work as a team. A career, drawn by a swarm of drones." />
+    <meta property="og:description" content="Eight years in robotics, as a behavior tree you can tick." />
     <meta property="og:image" content="https://v5.elejeune.me/og.jpg" />
     <meta property="og:url" content="https://v5.elejeune.me" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // the board takes over the tree once the script is up; if it never is, show the plain outline
+      document.documentElement.classList.add("js");
+      setTimeout(function () {
+        if (!document.documentElement.classList.contains("board-on")) document.documentElement.classList.remove("js");
+      }, 4000);
+    </script>
   </head>
   <body>
-    <a class="skip" href="#journey">Skip to the journey</a>
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="g-seq" viewBox="0 0 16 16"><path d="M2.5 8h10M9 4.2 12.8 8 9 11.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></symbol>
+      <symbol id="g-par" viewBox="0 0 16 16"><path d="M2.5 5h10M10 2.6 12.5 5 10 7.4M2.5 11h10M10 8.6l2.5 2.4-2.5 2.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></symbol>
+      <symbol id="g-act" viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="9" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7" /><path d="M6.8 6v4l3.2-2z" fill="currentColor" /></symbol>
+      <symbol id="g-cond" viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="6" ry="4.6" fill="none" stroke="currentColor" stroke-width="1.7" /><path d="M5.6 8.1 7.2 9.6 10.4 6.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></symbol>
+      <symbol id="g-clip" viewBox="0 0 16 16"><rect x="1.8" y="3.2" width="12.4" height="9.6" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7" /><path d="M6.6 5.9v4.2L10.2 8z" fill="currentColor" /></symbol>
+      <symbol id="g-doc" viewBox="0 0 16 16"><path d="M4 1.8h5.2L12.5 5v9.2H4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" /><path d="M6.2 8.2h4M6.2 10.9h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></symbol>
+      <symbol id="g-root" viewBox="0 0 16 16"><path d="M8 3 3.3 12 12.7 12" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55" /><circle cx="8" cy="3" r="2" fill="currentColor" /><circle cx="3.3" cy="12" r="2" fill="currentColor" /><circle cx="12.7" cy="12" r="2" fill="currentColor" /></symbol>
+      <symbol id="g-play" viewBox="0 0 16 16"><path d="M4.5 2.8v10.4L13 8z" fill="currentColor" /></symbol>
+      <symbol id="g-pause" viewBox="0 0 16 16"><rect x="3.5" y="2.8" width="3.2" height="10.4" rx="1" fill="currentColor" /><rect x="9.3" y="2.8" width="3.2" height="10.4" rx="1" fill="currentColor" /></symbol>
+      <symbol id="g-prev" viewBox="0 0 16 16"><path d="M10.5 3 5.5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" /></symbol>
+      <symbol id="g-next" viewBox="0 0 16 16"><path d="m5.5 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" /></symbol>
+      <symbol id="g-center" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.3" fill="currentColor" /><path d="M8 1.5v2.6M8 11.9v2.6M1.5 8h2.6M11.9 8h2.6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" /><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.5" /></symbol>
+    </svg>
 
-    <!-- the swarm draws behind everything; the page reads fine without it -->
-    <canvas id="swarm" aria-hidden="true"></canvas>
+    <a class="skip" href="#notes">Skip the tree</a>
 
-    <header class="nav">
-      <a class="nav-name" href="#top">Erwin Lejeune</a>
+    <header class="bar">
+      <a class="bar-name" href="#top" aria-label="Erwin Lejeune, back to the top">
+        <svg aria-hidden="true"><use href="#g-root" /></svg>
+        <span>Erwin Lejeune</span>
+        <span class="bar-file">career.bt</span>
+      </a>
       <nav aria-label="Sections">
-        <a href="#journey">Journey</a>
-        <a href="#work">Work</a>
-        <a href="#writing">Writing</a>
+        <a href="#top">Tree</a>
+        <a href="#notes">Notes</a>
         <a href="#photos">Photos</a>
-        <a class="nav-cta" href="#contact">Contact</a>
+        <a class="bar-cta" href="#contact">Contact</a>
       </nav>
     </header>
 
     <main>
-      <section id="top" class="hero stage" data-stage="murmur">
-        <div class="col-text">
-          <p class="eyebrow">
-            <img src="/avatar.webp" alt="" width="40" height="40" />
-            <span>Head of Robotics at <a href="https://sirb.ai/">SIRB.AI</a> · Abu Dhabi</span>
-          </p>
-          <h1>I build robots that work as a <em>team</em>.</h1>
-          <p class="lede">
-            Eight years of autonomy, from one robot solving a maze to swarms of drones flying a mission together. I lead the
-            team, and I still write the code.
-          </p>
-          <div class="actions">
-            <a class="btn" href="#journey">See the journey</a>
-            <a class="btn btn-quiet" href="mailto:erwin.lejeune15@gmail.com">Email me</a>
+      <section id="top" class="tree" aria-labelledby="hero-title">
+        <div class="stage">
+          <canvas class="gl" aria-hidden="true"></canvas>
+
+          <div class="hero">
+            <p class="eyebrow">
+              <img src="/avatar.webp" alt="" width="44" height="44" />
+              <span>Head of Robotics at <b>SIRB.AI</b> · Abu Dhabi</span>
+            </p>
+            <h1 id="hero-title">Erwin Lejeune</h1>
+            <p class="hero-sub">My career, as a <em>behavior tree</em>.</p>
+            <p class="lede">
+              Eight years in robotics, leading teams since 2021. I lead robotics software across orchestration, navigation
+              and fault management, and I still write the code: ROS&nbsp;2, C++, Python, Go.
+            </p>
+            <div class="actions">
+              <button type="button" class="btn" data-act="play">
+                <svg aria-hidden="true"><use href="#g-play" /></svg>Run the tree
+              </button>
+              <a class="btn btn-quiet" href="mailto:erwin.lejeune15@gmail.com">Email me</a>
+            </div>
+            <p class="hint"><span class="hint-desk">Scroll to tick it. Drag to pan, pinch or ctrl&nbsp;+&nbsp;scroll to zoom, arrow keys to step.</span><span class="hint-touch">Scroll to tick it. Pinch to zoom.</span></p>
+          </div>
+
+          <h2 class="sr-only">The tree</h2>
+          <ol class="bt" aria-label="Career, as a behavior tree">
+            <li>
+              <article class="node node--root" data-id="root" data-type="parallel" data-run="0" data-final="running">
+                <header class="node-head"><span class="glyph"><svg><use href="#g-root" /></svg></span><span class="kind">Parallel · root</span></header>
+                <p class="node-title">Erwin Lejeune</p>
+                <p class="node-sub">A parallel node ticks all of its branches on every tick.</p>
+              </article>
+              <ol class="kids">
+                <!-- ───────────── Learn ───────────── -->
+                <li>
+                  <article class="node node--chapter" data-id="learn" data-type="sequence" data-step="1" data-run="1.26" data-ok="4.88">
+                    <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                    <h3 class="node-title">Learn</h3>
+                    <p class="node-role">Electronics, then computers, then control.</p>
+                    <p class="node-years">2014 – 2021</p>
+                  </article>
+                  <ol class="kids">
+                    <li>
+                      <article class="node" data-id="bsc" data-type="action" data-run="1.38" data-ok="1.62">
+                        <p class="node-title">B.Sc. Electronics Engineering</p>
+                        <p class="node-sub">Nantes Université · 2014 – 2018</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node" data-id="ynov" data-type="action" data-run="1.82" data-ok="2.86">
+                        <p class="node-title">M.Sc. Computer Engineering &amp; Aeronautics</p>
+                        <p class="node-sub">Ynov Bordeaux · 2018 – 2019</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node" data-id="ecn" data-type="action" data-run="2.9" data-ok="4.86">
+                        <p class="node-title">M.Sc. Control &amp; Robotics</p>
+                        <p class="node-sub">Ecole Centrale de Nantes · 2019 – 2021</p>
+                      </article>
+                    </li>
+                  </ol>
+                </li>
+
+                <!-- ───────────── Build robots ───────────── -->
+                <li>
+                  <article class="node node--chapter" data-id="build" data-type="sequence" data-run="1.84" data-final="running">
+                    <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                    <h3 class="node-title">Build robots</h3>
+                    <p class="node-role">From one robot in a maze to swarms.</p>
+                    <p class="node-years">2018 – now</p>
+                  </article>
+                  <ol class="kids">
+                    <li>
+                      <article class="node node--chapter" data-id="embedded" data-type="sequence" data-step="2">
+                        <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                        <h3 class="node-title">Embedded</h3>
+                        <p class="node-role"><b>Embedded Software Engineer</b><br />Hiventive · Bordeaux, France</p>
+                        <p class="node-years">2018 – 2019</p>
+                        <p class="node-note">Kept for good: treat time, memory and bandwidth as a budget.</p>
+                      </article>
+                      <ol class="kids">
+                        <li>
+                          <article class="node" data-id="stm32" data-type="action">
+                            <p class="node-title">Build a virtual STM32 in SystemC/TLM</p>
+                            <p class="node-sub">Timers, I2C, CAN, GPIO and USART peripherals.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="qemu" data-type="action">
+                            <p class="node-title">Integrate it with QEMU</p>
+                            <p class="node-sub">Test against a model of the hardware first.</p>
+                          </article>
+                        </li>
+                      </ol>
+                    </li>
+
+                    <li>
+                      <article class="node node--chapter" data-id="autonomy" data-type="sequence" data-step="3">
+                        <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                        <h3 class="node-title">Autonomy</h3>
+                        <p class="node-role"><b>Robotics Assistant</b><br />Ingeniarius · Coimbra, Portugal</p>
+                        <p class="node-years">2019</p>
+                      </article>
+                      <ol class="kids">
+                        <li>
+                          <article class="node" data-id="stacks" data-type="action">
+                            <p class="node-title">Build full autonomy stacks from scratch</p>
+                            <p class="node-sub">With ROS and embedded systems.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="maze1" data-type="condition">
+                            <p class="node-title">Mapped maze solved?</p>
+                            <p class="node-sub">Won the competition.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="maze2" data-type="condition">
+                            <p class="node-title">Unmapped maze solved?</p>
+                            <p class="node-sub">Won that one too.</p>
+                          </article>
+                        </li>
+                      </ol>
+                    </li>
+
+                    <li>
+                      <article class="node node--chapter" data-id="research" data-type="parallel" data-step="4">
+                        <header class="node-head"><span class="glyph"><svg><use href="#g-par" /></svg></span><span class="kind">Parallel</span></header>
+                        <h3 class="node-title">Research</h3>
+                        <p class="node-role"><b>Robotics Researcher</b><br />Ecole Centrale de Nantes, France</p>
+                        <p class="node-years">2020 – 2021</p>
+                        <p class="node-note">Four research projects I led, and two papers. Meanwhile, a remote software job.</p>
+                      </article>
+                      <ol class="kids">
+                        <li>
+                          <article class="node" data-id="mapf" data-type="action" data-more="Paper">
+                            <p class="node-title">Multi-agent pathfinding</p>
+                            <p class="node-sub">Many robots, one map, no collisions.</p>
+                          </article>
+                          <ol class="kids">
+                            <li>
+                              <article class="node node--paper" data-id="p-mapf" data-type="paper">
+                                <p class="node-title"><a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions">Survey of the Multi-Agent Pathfinding Solutions</a></p>
+                                <p class="node-sub">Preprint · 2021</p>
+                              </article>
+                            </li>
+                          </ol>
+                        </li>
+                        <li>
+                          <article class="node" data-id="pddl" data-type="action">
+                            <p class="node-title">AI planning with PDDL</p>
+                            <p class="node-sub">Describe the world and the goal; let a planner find the steps.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="xenomai" data-type="action">
+                            <p class="node-title">Real-time ROS control on Xenomai</p>
+                            <p class="node-sub">With XDDP between the real-time and Linux sides.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="latency" data-type="action" data-more="Paper">
+                            <p class="node-title">ROS 2 latency benchmarking</p>
+                            <p class="node-sub">How much jitter a control loop really sees.</p>
+                          </article>
+                          <ol class="kids">
+                            <li>
+                              <article class="node node--paper" data-id="p-jitter" data-type="paper">
+                                <p class="node-title"><a href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case">Real-time Jitter Measurements under ROS2: the Inverted Pendulum Case</a></p>
+                                <p class="node-sub">Preprint · 2021</p>
+                              </article>
+                            </li>
+                          </ol>
+                        </li>
+                        <li>
+                          <article class="node" data-id="backend" data-type="action">
+                            <p class="node-title">Remote: backend services in Go</p>
+                            <p class="node-sub">Software Engineer at Hiventive. PostgreSQL, Docker, and a manager for candidates' programming tests.</p>
+                          </article>
+                        </li>
+                      </ol>
+                    </li>
+
+                    <li>
+                      <article class="node node--chapter" data-id="ship" data-type="sequence" data-step="5">
+                        <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                        <h3 class="node-title">Ship a real robot</h3>
+                        <p class="node-role"><b>Founding Robotics Engineer</b><br />Coalescent Mobile Robotics · Odense, Denmark</p>
+                        <p class="node-years">2021 – 2022</p>
+                        <p class="node-note">“A real store changes your priorities fast.”</p>
+                      </article>
+                      <ol class="kids">
+                        <li>
+                          <article class="node" data-id="nav" data-type="action">
+                            <p class="node-title">Lead the navigation stack</p>
+                            <p class="node-sub">Path planning, motion control, localization.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="percep" data-type="action">
+                            <p class="node-title">Contribute to perception</p>
+                            <p class="node-sub">Detection, filtering, tracking.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="store" data-type="condition">
+                            <p class="node-title">First in-store robot working?</p>
+                            <p class="node-sub">Yes: a supermarket robot, delivered by the founding team.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="cto" data-type="action">
+                            <p class="node-title">Take over when the CTO left</p>
+                            <p class="node-sub">Led navigation and trolley detection, recruited and trained interns and a junior engineer, turned the CEO's requirements into sprints.</p>
+                          </article>
+                        </li>
+                      </ol>
+                    </li>
+
+                    <li>
+                      <article class="node node--chapter" data-id="swarm" data-type="sequence" data-step="6">
+                        <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                        <h3 class="node-title">Swarm</h3>
+                        <p class="node-role"><b>Senior Engineer, Robotics Software</b><br />Technology Innovation Institute · Abu Dhabi</p>
+                        <p class="node-years">2022 – 2024</p>
+                      </article>
+                      <ol class="kids">
+                        <li>
+                          <article class="node" data-id="orch" data-type="action">
+                            <p class="node-title">Lead R&amp;D on multi-robot behaviour</p>
+                            <p class="node-sub">Components for orchestration, collaboration and control.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="flock" data-type="action" data-more="Paper">
+                            <p class="node-title">Design new swarm behaviours</p>
+                            <p class="node-sub">Including decentralized, bird-inspired flocking, published at IROS 2024.</p>
+                          </article>
+                          <ol class="kids">
+                            <li>
+                              <article class="node node--paper" data-id="p-flock" data-type="paper">
+                                <p class="node-title"><a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking">Decentralized Acceleration-Based Bird-Inspired Flocking</a></p>
+                                <p class="node-sub">IEEE/RSJ IROS 2024</p>
+                              </article>
+                            </li>
+                          </ol>
+                        </li>
+                        <li>
+                          <article class="node" data-id="demos1" data-type="action">
+                            <p class="node-title">Run live demos for partners</p>
+                            <p class="node-sub">The project led to USD 3M in contracts.</p>
+                          </article>
+                        </li>
+                      </ol>
+                    </li>
+
+                    <li>
+                      <article class="node node--chapter" data-id="lead" data-type="sequence" data-step="7">
+                        <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                        <h3 class="node-title">Lead</h3>
+                        <p class="node-role"><b>Team Lead, Robotics Software</b><br />Technology Innovation Institute · Abu Dhabi</p>
+                        <p class="node-years">2024 – 2026</p>
+                      </article>
+                      <ol class="kids">
+                        <li>
+                          <article class="node" data-id="team" data-type="action">
+                            <p class="node-title">Grow and lead a team of 9</p>
+                            <p class="node-sub">Autonomy, infrastructure (DevOps, RobotOps) and platform integration.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="overhaul" data-type="action">
+                            <p class="node-title">Overhaul the swarm autonomy</p>
+                            <p class="node-sub">−74% onboard CPU, −52% network bandwidth.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="caltech" data-type="action">
+                            <p class="node-title">Joint program with Caltech</p>
+                            <p class="node-sub">Outdoor planning and tracking for M4, their flying and rolling robot; work on their humanoid too.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="demos2" data-type="action">
+                            <p class="node-title">Demo to companies in Europe and the UAE</p>
+                            <p class="node-sub">USD 10M+ in contracts.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="aitools" data-type="action">
+                            <p class="node-title">Start building AI tooling for the team</p>
+                            <p class="node-sub">Ship more without lowering the bar.</p>
+                          </article>
+                        </li>
+                      </ol>
+                    </li>
+
+                    <li>
+                      <article class="node node--chapter" data-id="sirb" data-type="sequence" data-step="8" data-final="running">
+                        <header class="node-head"><span class="glyph"><svg><use href="#g-seq" /></svg></span><span class="kind">Sequence</span></header>
+                        <h3 class="node-title">Head of Robotics</h3>
+                        <p class="node-role"><b>Founding team</b><br />SIRB.AI · Abu Dhabi</p>
+                        <p class="node-years">Feb 2026 – now</p>
+                        <p class="node-note"><span lang="ar">سرب</span> (sirb) is Arabic for a flock, or a swarm.</p>
+                      </article>
+                      <ol class="kids">
+                        <li>
+                          <article class="node" data-id="arch" data-type="action">
+                            <p class="node-title">Design the robotics software architecture</p>
+                            <p class="node-sub">And the autonomy roadmap.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="heal" data-type="action">
+                            <p class="node-title">Build a self-healing autonomy layer</p>
+                            <p class="node-sub">Swarm-wide fault and state recording, agents that detect and recover from failures, ML mission scoring before launch.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="umex" data-type="condition">
+                            <p class="node-title">Public launch at UMEX 2026?</p>
+                            <p class="node-sub">Yes: unveiled as the Middle East's first AI-powered swarm platform.</p>
+                          </article>
+                        </li>
+                        <li>
+                          <article class="node" data-id="teams" data-type="action" data-final="running">
+                            <p class="node-title">Lead the robotics software teams</p>
+                            <p class="node-sub">Orchestration, navigation, fault management.</p>
+                          </article>
+                        </li>
+                      </ol>
+                    </li>
+                  </ol>
+                </li>
+
+                <!-- ───────────── Found ───────────── -->
+                <li>
+                  <article class="node node--chapter" data-id="found" data-type="parallel" data-step="9" data-run="7.3" data-final="running">
+                    <header class="node-head"><span class="glyph"><svg><use href="#g-par" /></svg></span><span class="kind">Parallel</span></header>
+                    <h3 class="node-title">Found</h3>
+                    <p class="node-role"><b>Founder</b><br />Unchained Labs · remote</p>
+                    <p class="node-years">2024 – now</p>
+                  </article>
+                  <ol class="kids">
+                    <li>
+                      <article class="node" data-id="agents" data-type="action" data-run="7.36" data-final="running">
+                        <p class="node-title">Local-first AI agents</p>
+                        <p class="node-sub">They run on a company's own models, data and infrastructure.</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="kymatics" data-type="project" data-run="7.36" data-final="running">
+                        <video muted loop playsinline preload="none" poster="/work/kymatics.webp" data-src="/work/kymatics.mp4" width="960" height="540"></video>
+                        <div class="proj-body">
+                          <p class="node-title">Kymatics</p>
+                          <p class="node-sub">Graph-based agent orchestration: a spoken intent becomes a queue of build jobs.</p>
+                          <p class="links"><a href="https://github.com/Unchained-Labs">Code</a><a href="https://unchainedlabs.dev/">unchainedlabs.dev</a></p>
+                        </div>
+                      </article>
+                    </li>
+                  </ol>
+                </li>
+
+                <!-- ───────────── Make tools ───────────── -->
+                <li>
+                  <article class="node node--chapter" data-id="tools" data-type="parallel" data-step="10 11">
+                    <header class="node-head"><span class="glyph"><svg><use href="#g-par" /></svg></span><span class="kind">Parallel</span></header>
+                    <h3 class="node-title">Make tools</h3>
+                    <p class="node-role">Open source. The clips are recordings of the real thing.</p>
+                  </article>
+                  <ol class="kids">
+                    <li>
+                      <article class="node" data-id="btview" data-type="action">
+                        <p class="node-title"><a href="https://marketplace.visualstudio.com/items?itemName=rangonomics.btview">BTView</a></p>
+                        <p class="node-sub">A visual behavior-tree editor for BehaviorTree.CPP, inside VS Code and Cursor.</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="grip" data-type="project">
+                        <video muted loop playsinline preload="none" poster="/work/grip.webp" data-src="/work/grip.mp4" width="960" height="540"></video>
+                        <div class="proj-body">
+                          <p class="node-title">grip</p>
+                          <p class="node-sub">A git hook that quizzes you on your own diff before you commit, and blocks anything below the pass mark.</p>
+                          <p class="links"><a href="https://github.com/guilyx/grip">Code</a><a href="https://guilyx.github.io/grip/">Docs</a></p>
+                        </div>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="pymapf" data-type="project">
+                        <video muted loop playsinline preload="none" poster="/work/pymapf.webp" data-src="/work/pymapf.mp4" width="960" height="540"></video>
+                        <div class="proj-body">
+                          <p class="node-title">PyMAPF</p>
+                          <p class="node-sub">Multi-agent pathfinding on any graph: CBS, PIBT, LaCAM, MAPF-LNS. The solvers stream their search live.</p>
+                          <p class="links"><a href="https://github.com/APLA-Toolbox/pymapf">Code</a><a href="https://apla-toolbox.github.io/pymapf/">Site</a></p>
+                        </div>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="jupyddl" data-type="project">
+                        <video muted loop playsinline preload="none" poster="/work/jupyddl.webp" data-src="/work/jupyddl.mp4" width="960" height="540"></video>
+                        <div class="proj-body">
+                          <p class="node-title">PythonPDDL</p>
+                          <p class="node-sub">A dependency-free PDDL framework: hand-written parser and grounder, 14 planners, trainable heuristics.</p>
+                          <p class="links"><a href="https://github.com/APLA-Toolbox/pythonpddl">Code</a><a href="https://apla-toolbox.github.io/PythonPDDL/">Site</a></p>
+                        </div>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="flybots" data-type="project">
+                        <video muted loop playsinline preload="none" poster="/work/flybots.webp" data-src="/work/flybots.mp4" width="960" height="540"></video>
+                        <div class="proj-body">
+                          <p class="node-title">flybots</p>
+                          <p class="node-sub">Multirotor, fixed-wing and VTOL flight physics from scratch: 40+ simulations and an RL gym.</p>
+                          <p class="links"><a href="https://github.com/guilyx/flybots">Code</a><a href="https://guilyx.github.io/flybots/">Site</a></p>
+                        </div>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="rostree" data-type="project">
+                        <video muted loop playsinline preload="none" poster="/work/rostree.webp" data-src="/work/rostree.mp4" width="960" height="540"></video>
+                        <div class="proj-body">
+                          <p class="node-title">rostree</p>
+                          <p class="node-sub">Explore a ROS 2 dependency graph (a DAG, not a tree) from the CLI, a TUI, or one HTML file.</p>
+                          <p class="links"><a href="https://github.com/guilyx/rostree">Code</a><a href="https://guilyx.github.io/rostree">Site</a></p>
+                        </div>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="roue" data-type="project">
+                        <video muted loop playsinline preload="none" poster="/work/roue.webp" data-src="/work/roue.mp4" width="960" height="600"></video>
+                        <div class="proj-body">
+                          <p class="node-title">roue</p>
+                          <p class="node-sub">Offline file converter for the Linux desktop: Ctrl+Shift+right-click a file, pick a format on a wheel.</p>
+                          <p class="links"><a href="https://github.com/guilyx/roue">Code</a><a href="https://guilyx.github.io/roue/">Site</a></p>
+                        </div>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node" data-id="jarvis" data-type="action">
+                        <p class="node-title"><a href="https://github.com/guilyx/jarvis_ros2">jarvis_ros2</a></p>
+                        <p class="node-sub">Fault and recovery management for ROS 2 robots.</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node" data-id="minigames" data-type="action">
+                        <p class="node-title"><a href="https://github.com/guilyx/awesome-daily-minigames">awesome-daily-minigames</a></p>
+                        <p class="node-sub">A list of 281 daily puzzle games.</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node" data-id="upstream" data-type="action">
+                        <p class="node-title">Merged upstream</p>
+                        <p class="node-sub">
+                          <a href="https://github.com/ros-navigation/navigation2/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">navigation2</a>,
+                          the ROS 2 navigation stack ·
+                          <a href="https://github.com/AtsushiSakai/PythonRobotics/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">PythonRobotics</a> ·
+                          <a href="https://github.com/TheAlgorithms/Python/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">TheAlgorithms/Python</a>
+                        </p>
+                      </article>
+                    </li>
+                  </ol>
+                </li>
+
+                <!-- ───────────── Off the clock ───────────── -->
+                <li>
+                  <article class="node node--chapter" data-id="life" data-type="parallel" data-step="12" data-run="0" data-final="running">
+                    <header class="node-head"><span class="glyph"><svg><use href="#g-par" /></svg></span><span class="kind">Parallel</span></header>
+                    <h3 class="node-title">Off the clock</h3>
+                    <p class="node-role">Running the whole time.</p>
+                  </article>
+                  <ol class="kids">
+                    <li>
+                      <article class="node" data-id="ball" data-type="action" data-run="0" data-final="running">
+                        <p class="node-title">Basketball</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node" data-id="films" data-type="action" data-run="0" data-final="running">
+                        <p class="node-title">Films</p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node" data-id="photo" data-type="action" data-run="0" data-final="running">
+                        <p class="node-title">Photography</p>
+                        <p class="node-sub"><a href="#photos">Twelve of them, below.</a></p>
+                      </article>
+                    </li>
+                    <li>
+                      <article class="node node--project" data-id="clanker" data-type="project" data-run="0" data-final="running">
+                        <video muted loop playsinline preload="none" poster="/work/clanker-labs.webp" data-src="/work/clanker-labs.mp4" width="1000" height="620"></video>
+                        <div class="proj-body">
+                          <p class="node-title">Clanker Labs</p>
+                          <p class="node-sub">My self-hosted home: notes, mail, media, passwords and money, with an agent in front so it doesn't need a sysadmin.</p>
+                          <p class="links"><a href="https://github.com/Clanker-Labs">Code</a><a href="https://clanker-labs.github.io/clanker-labs-public/">Site</a></p>
+                        </div>
+                      </article>
+                    </li>
+                  </ol>
+                </li>
+              </ol>
+            </li>
+          </ol>
+
+          <aside class="bb" aria-labelledby="bb-title">
+            <header class="bb-head">
+              <h2 id="bb-title">Blackboard</h2>
+              <span class="bb-count" aria-hidden="true"></span>
+              <button type="button" class="bb-toggle" aria-expanded="false" aria-label="Show the whole blackboard"></button>
+            </header>
+            <p class="bb-desc">The memory the nodes share. They write to it as they run.</p>
+            <p class="bb-empty">Empty for now. Values land here as the tree ticks.</p>
+            <dl class="bb-list">
+              <div data-at="0.5" data-key="base"><dt>base</dt><dd>Abu Dhabi</dd></div>
+              <div data-at="1.62" data-key="degrees" hidden><dt>degrees</dt><dd>1</dd></div>
+              <div data-at="2.6" data-key="virtual_mcu"><dt>virtual_mcu</dt><dd>STM32 · SystemC/TLM</dd></div>
+              <div data-at="2.86" data-key="degrees" hidden><dt>degrees</dt><dd>2</dd></div>
+              <div data-at="3.78" data-key="mazes_won"><dt>mazes_won</dt><dd>2 of 2</dd></div>
+              <div data-at="4.6" data-key="research_projects"><dt>research_projects</dt><dd>4</dd></div>
+              <div data-at="4.78" data-key="papers" hidden><dt>papers</dt><dd>2</dd></div>
+              <div data-at="4.86" data-key="degrees"><dt>degrees</dt><dd>3</dd></div>
+              <div data-at="5.62" data-key="store_robot"><dt>store_robot</dt><dd>working</dd></div>
+              <div data-at="5.82" data-key="leading_since"><dt>leading_since</dt><dd>2021</dd></div>
+              <div data-at="6.6" data-key="papers"><dt>papers</dt><dd>3 · IROS 2024</dd></div>
+              <div data-at="6.8" data-key="contracts" hidden><dt>contracts</dt><dd>USD 3M</dd></div>
+              <div data-at="7.3" data-key="company"><dt>company</dt><dd>Unchained Labs</dd></div>
+              <div data-at="7.42" data-key="team_size"><dt>team_size</dt><dd>9</dd></div>
+              <div data-at="7.52" data-key="onboard_cpu"><dt>onboard_cpu</dt><dd>−74%</dd></div>
+              <div data-at="7.54" data-key="bandwidth"><dt>bandwidth</dt><dd>−52%</dd></div>
+              <div data-at="7.64" data-key="partner"><dt>partner</dt><dd>Caltech · M4</dd></div>
+              <div data-at="7.74" data-key="contracts"><dt>contracts</dt><dd>USD 3M, then 10M+</dd></div>
+              <div data-at="8.3" data-key="years_in_robotics"><dt>years_in_robotics</dt><dd>8</dd></div>
+              <div data-at="8.66" data-key="launch"><dt>launch</dt><dd>UMEX 2026</dd></div>
+              <div data-at="11.8" data-key="upstream"><dt>upstream</dt><dd>navigation2 · PythonRobotics</dd></div>
+            </dl>
+          </aside>
+
+          <div class="dock" role="toolbar" aria-label="Tree playback">
+            <div class="dock-btns">
+              <button type="button" class="dock-btn" data-act="prev" aria-label="Previous tick"><svg aria-hidden="true"><use href="#g-prev" /></svg></button>
+              <button type="button" class="dock-btn dock-play" data-act="play" aria-label="Play"><svg aria-hidden="true"><use href="#g-play" /></svg></button>
+              <button type="button" class="dock-btn" data-act="next" aria-label="Next tick"><svg aria-hidden="true"><use href="#g-next" /></svg></button>
+            </div>
+            <div class="dock-main">
+              <p class="dock-now"><span class="dock-year"></span> <span class="dock-label"></span></p>
+              <ol class="ticks" aria-label="Ticks">
+                <li><button type="button" data-step="0" data-year="" aria-label="Start">Start</button></li>
+                <li><button type="button" data-step="1" data-year="2014">Learn</button></li>
+                <li><button type="button" data-step="2" data-year="2018">Embedded</button></li>
+                <li><button type="button" data-step="3" data-year="2019">Autonomy</button></li>
+                <li><button type="button" data-step="4" data-year="2020">Research</button></li>
+                <li><button type="button" data-step="5" data-year="2021">Ship a real robot</button></li>
+                <li><button type="button" data-step="6" data-year="2022">Swarm</button></li>
+                <li><button type="button" data-step="7" data-year="2024">Lead</button></li>
+                <li><button type="button" data-step="8" data-year="2026">Head of Robotics</button></li>
+                <li><button type="button" data-step="9" data-year="2024 →">Found</button></li>
+                <li><button type="button" data-step="10" data-year="">Make tools</button></li>
+                <li><button type="button" data-step="12" data-year="">Off the clock</button></li>
+                <li><button type="button" data-step="13" data-year="now">Still running</button></li>
+              </ol>
+            </div>
+            <button type="button" class="dock-btn dock-center" data-act="recenter" aria-label="Follow the tick again" hidden><svg aria-hidden="true"><use href="#g-center" /></svg><span>Follow</span></button>
+          </div>
+
+          <div class="outro" aria-hidden="true">
+            <p class="outro-k">Root status</p>
+            <p class="outro-t"><span class="pill pill--run">Running</span></p>
+            <p class="outro-p">Two branches are live today: SIRB.AI and Unchained Labs. Off the clock never stopped.</p>
           </div>
         </div>
-        <p class="hint">A swarm of tiny drones, flocking in your browser. Move your cursor through it.</p>
       </section>
 
-      <section id="journey" class="journey" aria-labelledby="journey-title">
-        <header class="section-head">
-          <h2 id="journey-title">The journey</h2>
-          <p>Scroll, and the swarm draws each chapter.</p>
+      <section id="notes" class="sheet notes" aria-labelledby="notes-title">
+        <header class="sheet-head">
+          <p class="sheet-k">Subtree · Notes</p>
+          <h2 id="notes-title">Notes, papers, and code upstream</h2>
         </header>
-
-        <article class="chapter stage" data-stage="chip">
-          <div class="col-text">
-            <p class="when"><span>2018</span> Hiventive · Bordeaux</p>
-            <h3>Starting at the chip</h3>
-            <p>
-              I wrote a virtual STM32 microcontroller in SystemC: timers, I2C, CAN, GPIO and USART, all running under QEMU.
-              Testing against a model of the hardware first became a habit I never dropped.
-            </p>
-            <ul class="facts">
-              <li><b>SystemC</b> virtual prototype</li>
-              <li><b>QEMU</b> integration</li>
-            </ul>
-          </div>
-          <p class="formation">Formation 01 — the chip</p>
-        </article>
-
-        <article class="chapter stage" data-stage="maze">
-          <div class="col-text">
-            <p class="when"><span>2019</span> Ingeniarius · Coimbra</p>
-            <h3>First robots, first wins</h3>
-            <p>
-              Full autonomy stacks with ROS on small robots, built from scratch. They won both maze competitions: the one
-              with a map, and the one without.
-            </p>
-            <ul class="facts">
-              <li><b>2 of 2</b> maze competitions won</li>
-            </ul>
-          </div>
-          <p class="formation">Formation 02 — a maze, and the path through it</p>
-        </article>
-
-        <article class="chapter stage" data-stage="paths">
-          <div class="col-text">
-            <p class="when"><span>2020</span> Centrale Nantes</p>
-            <h3>Planning, and two papers</h3>
-            <p>
-              Four research projects: multi-agent pathfinding, PDDL planning, real-time ROS on Xenomai, and ROS 2 latency.
-              I've had a soft spot for planning problems ever since.
-            </p>
-            <ul class="facts">
-              <li>
-                <a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions"
-                  ><b>Paper</b> Survey of multi-agent pathfinding</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case"
-                  ><b>Paper</b> Real-time jitter under ROS 2</a
-                >
-              </li>
-            </ul>
-          </div>
-          <p class="formation">Formation 03 — three agents sharing a grid, no collisions</p>
-        </article>
-
-        <article class="chapter stage" data-stage="cart">
-          <div class="col-text">
-            <p class="when"><span>2021</span> Coalescent · Odense</p>
-            <h3>A robot in a real supermarket</h3>
-            <p>
-              I built the navigation for a robot working store aisles: path planning, motion control and localization.
-              When the CTO left, I took over navigation and trolley detection, hired our first interns, and ran the sprints.
-            </p>
-            <ul class="facts">
-              <li><b>Founding</b> robotics engineer</li>
-              <li><b>First</b> team I led</li>
-            </ul>
-          </div>
-          <p class="formation">Formation 04 — the other thing in the aisle</p>
-        </article>
-
-        <article class="chapter stage" data-stage="bird">
-          <div class="col-text">
-            <p class="when"><span>2022</span> Technology Innovation Institute · Abu Dhabi</p>
-            <h3>From one robot to many</h3>
-            <p>
-              Multi-robot orchestration and new swarm behaviours, including a decentralized, bird-inspired flocking method
-              we published at IROS. The live demos brought in USD 3M in contracts.
-            </p>
-            <ul class="facts">
-              <li>
-                <a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking"
-                  ><b>IROS 2024</b> Bird-inspired flocking</a
-                >
-              </li>
-              <li><b>$3M</b> in contracts</li>
-            </ul>
-          </div>
-          <p class="formation">Formation 05 — where the flocking idea came from</p>
-        </article>
-
-        <article class="chapter stage" data-stage="minus">
-          <div class="col-text">
-            <p class="when"><span>2024</span> Technology Innovation Institute · Abu Dhabi</p>
-            <h3>Leading the team</h3>
-            <p>
-              I grew and led a team of nine across autonomy, infrastructure and integration. We overhauled the swarm stack,
-              ran a joint program with Caltech, and our demos led to more than USD 10M in contracts.
-            </p>
-            <ul class="facts">
-              <li><b>−74%</b> onboard CPU</li>
-              <li><b>−52%</b> bandwidth</li>
-              <li><b>9</b> engineers</li>
-            </ul>
-          </div>
-          <p class="formation">Formation 06 — the CPU we gave back to the drones</p>
-        </article>
-
-        <article class="chapter stage" data-stage="network">
-          <div class="col-text">
-            <p class="when"><span>2024</span> Unchained Labs</p>
-            <h3>Starting a company</h3>
-            <p>
-              AI agents that run on a company's own models, data and machines, and Kymatics, a graph-based orchestrator
-              that turns a spoken request into a queue of jobs.
-            </p>
-            <ul class="facts">
-              <li><a href="https://unchainedlabs.dev/"><b>unchainedlabs.dev</b></a></li>
-              <li><b>Local-first</b> agents</li>
-            </ul>
-          </div>
-          <p class="formation">Formation 07 — a graph of agents</p>
-        </article>
-
-        <article class="chapter stage" data-stage="sphere">
-          <div class="col-text">
-            <p class="when"><span>2026</span> SIRB.AI · Abu Dhabi</p>
-            <h3>Head of Robotics</h3>
-            <p>
-              Founding team. I designed the robotics architecture and a self-healing layer: when something fails, the
-              swarm notices and recovers on its own. We launched publicly at UMEX 2026.
-            </p>
-            <ul class="facts">
-              <li><b>Self-healing</b> swarm autonomy</li>
-              <li><b>UMEX 2026</b> launch</li>
-            </ul>
-          </div>
-          <p class="formation">Formation 08 — a sirb, Arabic for a swarm</p>
-        </article>
-      </section>
-
-      <section id="work" class="work stage" data-stage="park" aria-labelledby="work-title">
-        <header class="section-head">
-          <h2 id="work-title">Things I build on my own time</h2>
-          <p>All open source. Every clip was recorded from the real thing running.</p>
-        </header>
-        <div class="cards">
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/grip.webp" src="/work/grip.mp4"></video>
-            <div class="card-body">
-              <h3>grip</h3>
-              <p>A git hook that quizzes you on your own diff before you push. AI can write the code; someone still has to understand it.</p>
-              <p class="tags">Python · LLM grading · Git hooks</p>
-              <p class="links"><a href="https://github.com/guilyx/grip">Code</a><a href="https://guilyx.github.io/grip/">Docs</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/pymapf.webp" src="/work/pymapf.mp4"></video>
-            <div class="card-body">
-              <h3>PyMAPF</h3>
-              <p>Multi-agent pathfinding on any graph: CBS, PIBT, LaCAM and MAPF-LNS, with the search drawn live as it runs.</p>
-              <p class="tags">Python · Planning · Graph search</p>
-              <p class="links">
-                <a href="https://github.com/APLA-Toolbox/pymapf">Code</a><a href="https://apla-toolbox.github.io/pymapf/">Playground</a>
-              </p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/kymatics.webp" src="/work/kymatics.mp4"></video>
-            <div class="card-body">
-              <h3>Kymatics</h3>
-              <p>Say what you want built, and a graph of local agents turns it into a queue of build jobs.</p>
-              <p class="tags">Rust · Python · Agents · Voice</p>
-              <p class="links"><a href="https://github.com/Unchained-Labs">Code</a><a href="https://unchainedlabs.dev/">Unchained Labs</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/flybots.webp" src="/work/flybots.mp4"></video>
-            <div class="card-body">
-              <h3>flybots</h3>
-              <p>Multirotor, fixed-wing and VTOL flight from first principles, with 40+ simulations and a gym for teaching a drone to fly.</p>
-              <p class="tags">Python · Flight dynamics · RL</p>
-              <p class="links"><a href="https://github.com/guilyx/flybots">Code</a><a href="https://guilyx.github.io/flybots/">Site</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/rostree.webp" src="/work/rostree.mp4"></video>
-            <div class="card-body">
-              <h3>rostree</h3>
-              <p>Explore a ROS 2 dependency graph from the terminal, a TUI, or one HTML file that still opens on an offline robot.</p>
-              <p class="tags">Python · ROS 2 · Graphs</p>
-              <p class="links"><a href="https://github.com/guilyx/rostree">Code</a><a href="https://guilyx.github.io/rostree">Site</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/jupyddl.webp" src="/work/jupyddl.mp4"></video>
-            <div class="card-body">
-              <h3>PythonPDDL</h3>
-              <p>A dependency-free PDDL planner: parser, grounder, 14 planners and heuristics you can train on your own plans.</p>
-              <p class="tags">Python · PDDL · Heuristic search</p>
-              <p class="links">
-                <a href="https://github.com/APLA-Toolbox/pythonpddl">Code</a><a href="https://apla-toolbox.github.io/PythonPDDL/">Workbench</a>
-              </p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/roue.webp" src="/work/roue.mp4"></video>
-            <div class="card-body">
-              <h3>roue</h3>
-              <p>A radial file converter for the Linux desktop. Right-click a file, pick a format, done. Fully offline.</p>
-              <p class="tags">Python · GTK 4 · FFmpeg</p>
-              <p class="links"><a href="https://github.com/guilyx/roue">Code</a><a href="https://guilyx.github.io/roue/">Site</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/clanker-labs.webp" src="/work/clanker-labs.mp4"></video>
-            <div class="card-body">
-              <h3>Clanker Labs</h3>
-              <p>A self-hosted home for notes, mail, media and money, kept running by an agent instead of a sysadmin.</p>
-              <p class="tags">Ansible · Docker · MCP</p>
-              <p class="links">
-                <a href="https://github.com/Clanker-Labs">Code</a><a href="https://clanker-labs.github.io/clanker-labs-public/">Site</a>
-              </p>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section id="writing" class="writing stage" data-stage="park" aria-labelledby="writing-title">
-        <header class="section-head">
-          <h2 id="writing-title">Papers, open source, notes</h2>
-        </header>
-        <div class="lists">
-          <div>
-            <h3>Papers</h3>
-            <ul>
-              <li>
-                <a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking"
-                  >Decentralized acceleration-based bird-inspired flocking</a
-                ><span>IROS 2024</span>
-              </li>
-              <li>
-                <a href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case"
-                  >Real-time jitter measurements under ROS 2</a
-                ><span>Preprint · 2021</span>
-              </li>
-              <li>
-                <a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions"
-                  >Survey of multi-agent pathfinding solutions</a
-                ><span>Preprint · 2021</span>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3>Upstream</h3>
-            <ul>
-              <li>
-                <a href="https://github.com/ros-navigation/navigation2/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">ros-navigation/navigation2</a
-                ><span>The ROS 2 navigation stack</span>
-              </li>
-              <li>
-                <a href="https://github.com/AtsushiSakai/PythonRobotics/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">AtsushiSakai/PythonRobotics</a
-                ><span>Robotics algorithms, animated</span>
-              </li>
-              <li>
-                <a href="https://github.com/TheAlgorithms/Python/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">TheAlgorithms/Python</a
-                ><span>Graph search algorithms</span>
-              </li>
-            </ul>
-          </div>
-          <div>
+        <div class="notes-grid">
+          <div class="panel">
             <h3>Notes</h3>
-            <ul>
+            <ul class="rows">
               <li><a href="https://v4.elejeune.me/blog/pi-voice-assistant">A homemade Alexa, and the agents that will hack my house</a><span>Oct 2026</span></li>
               <li><a href="https://v4.elejeune.me/blog/btview">BTView: behavior trees you can actually review</a><span>Aug 2026</span></li>
               <li><a href="https://v4.elejeune.me/blog/rostree">rostree: exploring a graph instead of drawing a tree</a><span>Aug 2026</span></li>
               <li><a href="https://v4.elejeune.me/blog/zucman">zucman: a data-viz kit for a tax policy argument</a><span>Aug 2026</span></li>
             </ul>
           </div>
+          <div class="panel">
+            <h3>Papers</h3>
+            <ul class="rows">
+              <li><a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking">Decentralized Acceleration-Based Bird-Inspired Flocking</a><span>IEEE/RSJ IROS 2024</span></li>
+              <li><a href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case">Real-time Jitter Measurements under ROS2: the Inverted Pendulum Case</a><span>Preprint · 2021</span></li>
+              <li><a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions">Survey of the Multi-Agent Pathfinding Solutions</a><span>Preprint · 2021</span></li>
+            </ul>
+          </div>
+          <div class="panel">
+            <h3>Merged upstream</h3>
+            <ul class="rows">
+              <li><a href="https://github.com/ros-navigation/navigation2/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">ros-navigation/navigation2</a><span>The ROS 2 navigation stack</span></li>
+              <li><a href="https://github.com/AtsushiSakai/PythonRobotics/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">AtsushiSakai/PythonRobotics</a><span>Robotics algorithms</span></li>
+              <li><a href="https://github.com/TheAlgorithms/Python/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">TheAlgorithms/Python</a><span>Algorithms in Python</span></li>
+            </ul>
+          </div>
         </div>
+        <aside class="harness">
+          <p class="sheet-k">How my team ships with AI</p>
+          <ol class="pipe">
+            <li>Draft</li>
+            <li>AI review</li>
+            <li>Checks</li>
+            <li>Quiz: <em>can you explain your diff?</em></li>
+            <li>Human review</li>
+            <li>Ship</li>
+          </ol>
+          <p>AI lets a team ship more without lowering the bar. The real work is the harness around it, and every change goes through it, whoever or whatever wrote it.</p>
+        </aside>
       </section>
 
-      <section id="photos" class="photos stage" data-stage="park" aria-labelledby="photos-title">
-        <header class="section-head">
-          <h2 id="photos-title">Off the clock</h2>
-          <p>Basketball, road trips, and whatever's in front of the camera.</p>
+      <section id="photos" class="sheet photos" aria-labelledby="photos-title">
+        <header class="sheet-head">
+          <p class="sheet-k">Subtree · Off the clock</p>
+          <h2 id="photos-title">Through my lens</h2>
+          <p>California and the US West, Paris, Togo, the Maldives.</p>
         </header>
-        <div class="strip" tabindex="0" aria-label="Photos — scroll sideways">
-          <figure>
-            <a href="/photos/yosemite-landscape-1600.webp" data-caption="Yosemite · California">
-              <img src="/photos/yosemite-landscape-800.webp" srcset="/photos/yosemite-landscape-800.webp 800w, /photos/yosemite-landscape-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Yosemite, California" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Yosemite</b> · California</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/clinton-ball-1600.webp" data-caption="Clinton ball · USA">
-              <img src="/photos/clinton-ball-800.webp" srcset="/photos/clinton-ball-800.webp 800w, /photos/clinton-ball-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Clinton ball, USA" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Clinton ball</b> · USA</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/grand-canyon-1600.webp" data-caption="Grand Canyon · USA">
-              <img src="/photos/grand-canyon-800.webp" srcset="/photos/grand-canyon-800.webp 800w, /photos/grand-canyon-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1069" height="1600" alt="Grand Canyon, USA" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Grand Canyon</b> · USA</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/paris-monument-1600.webp" data-caption="Monument · Paris">
-              <img src="/photos/paris-monument-800.webp" srcset="/photos/paris-monument-800.webp 800w, /photos/paris-monument-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Monument, Paris" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Monument</b> · Paris</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/togo-cooking-girls-clors-1600.webp" data-caption="Cooking, in colour · Togo">
-              <img src="/photos/togo-cooking-girls-clors-800.webp" srcset="/photos/togo-cooking-girls-clors-800.webp 800w, /photos/togo-cooking-girls-clors-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1238" height="827" alt="Cooking, in colour, Togo" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Cooking, in colour</b> · Togo</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/pavel-zion-happy-1600.webp" data-caption="Pavel, happy · Zion">
-              <img src="/photos/pavel-zion-happy-800.webp" srcset="/photos/pavel-zion-happy-800.webp 800w, /photos/pavel-zion-happy-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Pavel, happy, Zion" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Pavel, happy</b> · Zion</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/parisbaguette-1600.webp" data-caption="Paris Baguette · Paris">
-              <img src="/photos/parisbaguette-800.webp" srcset="/photos/parisbaguette-800.webp 800w, /photos/parisbaguette-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1069" height="1600" alt="Paris Baguette, Paris" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Paris Baguette</b> · Paris</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/santabarabarapier-1600.webp" data-caption="The pier · Santa Barbara">
-              <img src="/photos/santabarabarapier-800.webp" srcset="/photos/santabarabarapier-800.webp 800w, /photos/santabarabarapier-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="The pier, Santa Barbara" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>The pier</b> · Santa Barbara</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/skating-santa-monica-1600.webp" data-caption="Skating · Santa Monica">
-              <img src="/photos/skating-santa-monica-800.webp" srcset="/photos/skating-santa-monica-800.webp 800w, /photos/skating-santa-monica-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1069" height="1600" alt="Skating, Santa Monica" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Skating</b> · Santa Monica</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/maldives-hanging-shel-1600.webp" data-caption="Hanging shells · Maldives">
-              <img src="/photos/maldives-hanging-shel-800.webp" srcset="/photos/maldives-hanging-shel-800.webp 800w, /photos/maldives-hanging-shel-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Hanging shells, Maldives" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Hanging shells</b> · Maldives</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/cathedral-lakes-1600.webp" data-caption="Cathedral Lakes · USA">
-              <img src="/photos/cathedral-lakes-800.webp" srcset="/photos/cathedral-lakes-800.webp 800w, /photos/cathedral-lakes-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Cathedral Lakes, USA" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Cathedral Lakes</b> · USA</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/zion-trail-1600.webp" data-caption="Zion trail · Zion">
-              <img src="/photos/zion-trail-800.webp" srcset="/photos/zion-trail-800.webp 800w, /photos/zion-trail-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Zion trail, Zion" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Zion trail</b> · Zion</figcaption>
-          </figure>
-        </div>
-        <div class="strip-nav">
-          <button type="button" data-dir="-1" aria-label="Previous photos">←</button>
-          <button type="button" data-dir="1" aria-label="Next photos">→</button>
+        <div class="gallery">
+          <figure><a href="/photos/yosemite-landscape-1600.webp" data-caption="Yosemite · California"><img src="/photos/yosemite-landscape-800.webp" width="1600" height="1069" alt="Yosemite valley, California" loading="lazy" decoding="async" /></a><figcaption><b>Yosemite</b> · California</figcaption></figure>
+          <figure><a href="/photos/grand-canyon-1600.webp" data-caption="Grand Canyon · USA"><img src="/photos/grand-canyon-800.webp" width="1069" height="1600" alt="Grand Canyon, USA" loading="lazy" decoding="async" /></a><figcaption><b>Grand Canyon</b> · USA</figcaption></figure>
+          <figure><a href="/photos/clinton-ball-1600.webp" data-caption="Clinton ball · USA"><img src="/photos/clinton-ball-800.webp" width="1600" height="1069" alt="A basketball game, Clinton, USA" loading="lazy" decoding="async" /></a><figcaption><b>Clinton ball</b> · USA</figcaption></figure>
+          <figure><a href="/photos/togo-cooking-girls-clors-1600.webp" data-caption="Cooking, in colour · Togo"><img src="/photos/togo-cooking-girls-clors-800.webp" width="1238" height="827" alt="Cooking, in colour, Togo" loading="lazy" decoding="async" /></a><figcaption><b>Cooking, in colour</b> · Togo</figcaption></figure>
+          <figure><a href="/photos/paris-monument-1600.webp" data-caption="Monument · Paris"><img src="/photos/paris-monument-800.webp" width="1600" height="1069" alt="A monument in Paris" loading="lazy" decoding="async" /></a><figcaption><b>Monument</b> · Paris</figcaption></figure>
+          <figure><a href="/photos/skating-santa-monica-1600.webp" data-caption="Skating · Santa Monica"><img src="/photos/skating-santa-monica-800.webp" width="1069" height="1600" alt="Skating, Santa Monica" loading="lazy" decoding="async" /></a><figcaption><b>Skating</b> · Santa Monica</figcaption></figure>
+          <figure><a href="/photos/pavel-zion-happy-1600.webp" data-caption="Pavel, happy · Zion"><img src="/photos/pavel-zion-happy-800.webp" width="1600" height="1069" alt="Pavel, happy, in Zion" loading="lazy" decoding="async" /></a><figcaption><b>Pavel, happy</b> · Zion</figcaption></figure>
+          <figure><a href="/photos/maldives-hanging-shel-1600.webp" data-caption="Hanging shells · Maldives"><img src="/photos/maldives-hanging-shel-800.webp" width="1600" height="1069" alt="Hanging shells, Maldives" loading="lazy" decoding="async" /></a><figcaption><b>Hanging shells</b> · Maldives</figcaption></figure>
+          <figure><a href="/photos/parisbaguette-1600.webp" data-caption="Paris Baguette · Paris"><img src="/photos/parisbaguette-800.webp" width="1069" height="1600" alt="Paris Baguette, Paris" loading="lazy" decoding="async" /></a><figcaption><b>Paris Baguette</b> · Paris</figcaption></figure>
+          <figure><a href="/photos/santabarabarapier-1600.webp" data-caption="The pier · Santa Barbara"><img src="/photos/santabarabarapier-800.webp" width="1600" height="1069" alt="The pier, Santa Barbara" loading="lazy" decoding="async" /></a><figcaption><b>The pier</b> · Santa Barbara</figcaption></figure>
+          <figure><a href="/photos/cathedral-lakes-1600.webp" data-caption="Cathedral Lakes · USA"><img src="/photos/cathedral-lakes-800.webp" width="1600" height="1069" alt="Cathedral Lakes, USA" loading="lazy" decoding="async" /></a><figcaption><b>Cathedral Lakes</b> · USA</figcaption></figure>
+          <figure><a href="/photos/zion-trail-1600.webp" data-caption="Zion trail · Zion"><img src="/photos/zion-trail-800.webp" width="1600" height="1069" alt="A trail in Zion" loading="lazy" decoding="async" /></a><figcaption><b>Zion trail</b> · Zion</figcaption></figure>
         </div>
       </section>
 
-      <section id="contact" class="contact stage" data-stage="hello" aria-labelledby="contact-title">
-        <div class="col-text">
+      <section id="contact" class="sheet contact" aria-labelledby="contact-title">
+        <div class="contact-card">
+          <p class="sheet-k"><span class="glyph"><svg aria-hidden="true"><use href="#g-act" /></svg></span> Action · say_hello</p>
           <h2 id="contact-title">Say <em>hello</em>.</h2>
-          <p>
-            I'm not looking for a new role, but I read everything. A question about multi-agent planning, an open-source
-            idea, or just hi.
-          </p>
+          <p>Write to me about multi-agent planning, behavior trees, or an open-source idea.</p>
           <div class="actions">
             <a class="btn" href="mailto:erwin.lejeune15@gmail.com">erwin.lejeune15@gmail.com</a>
             <a class="btn btn-quiet" href="https://resume.elejeune.me">Résumé</a>
@@ -465,10 +719,10 @@
       <p><a href="https://v4.elejeune.me">Previous version</a></p>
     </footer>
 
-    <dialog class="viewer" aria-label="Photo">
-      <img alt="" />
+    <dialog class="viewer" aria-label="Viewer">
+      <div class="viewer-media"></div>
       <p class="viewer-cap"></p>
-      <button type="button" class="viewer-close" aria-label="Close">Close</button>
+      <button type="button" class="viewer-close">Close</button>
     </dialog>
 
     <script type="module" src="/src/main.ts"></script>
