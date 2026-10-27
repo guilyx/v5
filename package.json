@@ -3,7 +3,7 @@
   "type": "module",
   "version": "5.0.0",
   "private": true,
-  "description": "v5 of Erwin Lejeune's portfolio — a career, drawn by a swarm of drones in three.js",
+  "description": "v5 of Erwin Lejeune's portfolio — eight years of robotics as a tiny city on a turntable, in three.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@fontsource-variable/fraunces": "^5.3.0",
     "@fontsource-variable/geist": "^5.3.0",
-    "@fontsource/instrument-serif": "^5.3.0",
     "three": "^0.186.1"
   },
   "devDependencies": {
