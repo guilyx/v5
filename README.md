@@ -1,107 +1,70 @@
 # elejeune.me — v5
 
-The fifth iteration of my portfolio, and the first one you fly.
-
-The route is the [guilyx mark](https://github.com/guilyx/branding/blob/master/brand/logo.md)
-scaled up until a camera fits on it: three waypoints at the corners of a
-triangle, joined by an open path that enters at the apex and stops at the third
-node. Scrolling flies that path. Every chapter of the career sits on it as a
-3D scene, and the last shot climbs high enough to read the whole route as what
-it always was — the mark.
+A career, drawn by a swarm of drones.
 
 ![v5](public/og.jpg)
 
-## The flight
+About a thousand small quadcopters flock in the hero and scatter around your
+cursor. Scroll, and they fly into a new formation for each chapter: the chip I
+started on, the maze my robots solved, the shopping cart from the supermarket
+robot, the bird behind the flocking paper, the CPU we gave back to the drones,
+a graph of agents, and a sphere for SIRB.AI — *sirb* is Arabic for a swarm.
 
-| Stop | What you see |
-| :--- | :--- |
-| launch | The apex waypoint, and the mark at monument scale, turning only in 120° steps |
-| metal · 2018 | A virtual STM32 with bus traffic on its traces, then a maze robot that floods, solves and drives |
-| research · 2020 | Multi-agent pathfinding (prioritized space-time A*, solved on load), a cart-pole with its jitter histogram, the papers — click to read |
-| field · 2021 | A supermarket: costmap, global plan, a lidar that raycasts the shelving, a tracked trolley, and a chase camera on the robot |
-| swarm · 2022 | The left waypoint. The companion flock does the job: murmuration, wedge formation behind a virtual leader, Voronoi coverage sweep, triangulation |
-| team · 2024 | −74% CPU and −52% bandwidth as bars that shrink, the team of nine, and Caltech's M4 folding its wheels into rotors |
-| company · 2024 | Unchained Labs: a spoken intent through the Kymatics agent graph into a queue of build jobs, all inside the client's box |
-| now · 2026 | SIRB.AI: a self-healing ring, a 16-node behavior tree densified into its six actions, faults on one timeline |
-| agentic era | Six gates you fly through — draft, AI review, checks, quiz, human review, ship |
-| builds | The real promo clips on screens hung at the altitude each project runs at |
-| open source | The archive as a constellation, placed by year, upstream projects as the bright stars |
-| lens | Every photo from v4, by trip — click for the full print |
-| open channel | The right waypoint, then the pull-back that reveals the route as the mark |
+The words are plain HTML in their own column. The swarm never sits behind text.
 
-The flock that follows you is a real boids simulation — separation,
-alignment, cohesion, and a goal force each scene sets. It's drawn in the
-brand's `agent` grey: texture, not decoration. Your pointer is a hawk.
+## How it's built
 
-## Stack
-
-- **[three.js](https://threejs.org)** — no framework on top; every scene is a function returning a group, its camera keys and an `update`
-- **TypeScript + [Vite](https://vite.dev)**
-- **No animation library.** Scroll maps to a position along two centripetal Catmull-Rom splines (camera and look target), and the camera chases it with exponential damping
+- **Page first.** `index.html` holds every word and link; it reads fine with no
+  JavaScript and no WebGL. The page's own script is under 2 KB.
+- **3D second.** three.js loads lazily once the page is idle. One instanced
+  mesh, no post-processing, no physics engine.
+- **Formations are drawings.** Each chapter's shape is drawn on a small
+  offscreen canvas (ink in black, the highlight in red) and sampled on a hex
+  grid, so drones sit evenly like a real drone show. See `src/swarm/shapes.ts`.
+- **Scroll drives it directly.** The scroll position picks the two formations
+  to blend and how far along; nothing eases the scroll itself, so the swarm
+  answers the wheel straight away. A stiff spring per drone just rounds off the
+  motion.
+- **It sleeps.** While you read the project grid the drones are parked above
+  the page and the canvas stops rendering.
+- **About 0.35 ms of CPU per frame** for the whole swarm, measured in dev.
 
 ## Structure
 
 ```
-src/
-├── content.ts            ← ALL the words and numbers (ported from v4's site.ts and the résumé)
-├── main.ts               ← boot, loader, frame loop, clicks
-├── core/
-│   ├── world.ts          ← the route (the mark), ground, waypoints, dust, stars
-│   ├── journey.ts        ← scroll → key index → camera
-│   ├── flock.ts          ← the companion boids
-│   ├── labels.ts         ← HTML labels pinned to points in 3D
-│   ├── engine.ts         ← renderer, bloom, grade, adaptive pixel ratio
-│   └── util.ts           ← Ink & Iris palette, shared materials
-├── scenes/               ← one file per chapter
-└── ui/
-    ├── sections.ts       ← the readable panels, one per stop, in document order
-    ├── hud.ts            ← waypoint rail, telemetry, panel crossfades
-    └── lightbox.ts
-public/
-├── media/                ← promo clips + posters (from v4)
-└── photos/               ← full-size prints, and sm/ for textures
+index.html            all the content
+src/main.ts           photo viewer, clips that play in view, nav state, lazy-loads the swarm
+src/styles.css        the design system: paper, ink, one orange
+src/swarm/index.ts    renderer, drones, scroll → formation blend, cursor
+src/swarm/shapes.ts   the formations
+public/work/          project clips (960px, 30 s loops) and posters
+public/photos/        twelve photos at 800 and 1600px
 ```
 
 ## Commands
 
-| Command             | Action                               |
-| :------------------ | :----------------------------------- |
-| `npm install`       | Install dependencies                 |
-| `npm run dev`       | Dev server at `localhost:5173`       |
-| `npm run build`     | Typecheck, then build to `./dist/`   |
-| `npm run preview`   | Preview the build                    |
+| Command           | Action                             |
+| :---------------- | :--------------------------------- |
+| `npm install`     | Install dependencies               |
+| `npm run dev`     | Dev server at `localhost:5173`     |
+| `npm run build`   | Typecheck, then build to `./dist/` |
+| `npm run preview` | Preview the build                  |
 
 ## Editing
 
-**Words** live in `src/content.ts`. Scenes read their numbers from there too
-(the rework percentages, the archive, the photo list), so changing a fact
-changes the drawing.
+- **Words, links, projects, photos** — `index.html`.
+- **A new chapter** — add an `<article class="chapter stage" data-stage="name">`
+  and a matching drawing in `buildFormations()` in `src/swarm/shapes.ts`.
+- **Clips** — re-encode new ones the same way:
+  `ffmpeg -i in.mp4 -t 30 -an -vf "scale='min(960,iw)':-2,fps=30" -c:v libx264 -preset slow -crf 30 -pix_fmt yuv420p -movflags +faststart out.mp4`
 
-**A new chapter** is a file in `src/scenes/` that returns a `Scene`: a group
-placed on the route with `env.world.frame(leg, f)`, one or more stops (each a
-DOM id, a scroll length in `vh`, and camera keys in the scene's local frame,
-where −Z is the direction of travel), and an `update`. Add a panel for each
-stop in `src/ui/sections.ts` and the factory to the list in `src/main.ts`.
+## Accessibility
 
-**Photos**: drop the full-size image in `public/photos/`, a ~640px copy in
-`public/photos/sm/`, and add it to a trip in `content.ts`.
-
-## Accessibility and fallbacks
-
-- Every panel is real HTML in reading order; the canvas is `aria-hidden`.
-- `prefers-reduced-motion` drops the camera inertia and slows everything that moves on its own.
-- No WebGL: the page becomes a plain, readable document.
-- The pixel ratio steps down if frames run long, so a weaker GPU gets a softer image instead of a stutter.
+- Reduced motion: the swarm only moves when you scroll — no flocking, no arcs; clips only play on hover.
+- The canvas is `aria-hidden` and never takes pointer events.
+- Photos open in a native `<dialog>`; arrow keys step through them.
 
 ## Deploying
 
-Static output — `npm run build`, serve `dist/`. On Vercel it's zero-config.
-Update the domain in `index.html` (`og:url`, `og:image`) and `src/content.ts`
-if it changes.
-
-## Credits
-
-Colour, mark and voice: [guilyx/branding](https://github.com/guilyx/branding).
-Content, clips and photos: [guilyx/v4](https://github.com/guilyx/v4). The
-layout lineage of v4 owes a debt to [Brittany Chiang's v4](https://v4.brittanychiang.com/);
-the panels here inherit some of that restraint.
+Static output — `npm run build` and serve `dist/`. On Vercel, import the repo;
+Vite is detected with no configuration.
