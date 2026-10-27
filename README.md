@@ -1,45 +1,76 @@
-# elejeune.me — v5
+# elejeune.me — v5 · Globe Itinerary
 
-A career, drawn by a swarm of drones.
+An atlas of eight years in robotics. A printed-atlas globe flies you city to city while
+the route inks itself in: Nantes → Bordeaux → Coimbra → Nantes → Odense → Abu Dhabi,
+with a teal arc to Pasadena for the Caltech joint program, and my own photos pinned
+where they were taken.
 
 ![v5](public/og.jpg)
 
-About a thousand small quadcopters flock in the hero and scatter around your
-cursor. Scroll, and they fly into a new formation for each chapter: the chip I
-started on, the maze my robots solved, the shopping cart from the supermarket
-robot, the bird behind the flocking paper, the CPU we gave back to the drones,
-a graph of agents, and a sphere for SIRB.AI — *sirb* is Arabic for a swarm.
+## How you move through it
 
-The words are plain HTML in their own column. The swarm never sits behind text.
+- **Scroll** is the journey. Each chapter card docks while the globe holds on its city;
+  between two cards the camera flies the great circle and that leg of the route draws
+  itself with a travelling dash. The camera is a pure function of the scroll position
+  with 70 ms of smoothing, so it answers the wheel straight away.
+- **Drag** turns the globe, with inertia. Scroll again (or press *Back to the route*) and
+  it eases back onto the route.
+- **Pinch**, or **Ctrl + scroll** on the globe, zooms. A plain wheel always stays the journey.
+- **Pins**: a city pin opens its chapter; a round photo pin opens its photos. During the
+  travel chapter the pin you're flying over opens into a postcard on its own.
+- **Passport** (top right): stamps for every place and its years. Tap one to fly there.
+- After the journey: the workshop (project clips), papers and notes, postcards, and a
+  last look at the whole route for contact.
+
+The night side of the globe is the real one, computed from the time you open the page.
 
 ## How it's built
 
-- **Page first.** `index.html` holds every word and link; it reads fine with no
-  JavaScript and no WebGL. The page's own script is under 2 KB.
-- **3D second.** three.js loads lazily once the page is idle. One instanced
-  mesh, no post-processing, no physics engine.
-- **Formations are drawings.** Each chapter's shape is drawn on a small
-  offscreen canvas (ink in black, the highlight in red) and sampled on a hex
-  grid, so drones sit evenly like a real drone show. See `src/swarm/shapes.ts`.
-- **Scroll drives it directly.** The scroll position picks the two formations
-  to blend and how far along; nothing eases the scroll itself, so the swarm
-  answers the wheel straight away. A stiff spring per drone just rounds off the
-  motion.
-- **It sleeps.** While you read the project grid the drones are parked above
-  the page and the canvas stops rendering.
-- **About 0.35 ms of CPU per frame** for the whole swarm, measured in dev.
+- **Words first.** `index.html` holds every word and link. It reads fine with no
+  JavaScript and no WebGL.
+- **A flat plate, then the globe.** The first frame is drawn with Canvas 2D (same camera,
+  same dots) so the title page is complete before three.js arrives. three.js is a lazy
+  chunk; when it is ready the WebGL globe fades in over the plate. Without WebGL the plate
+  stays and redraws when the view settles.
+- **Three draw calls.** A sphere whose shader paints the paper ocean, graticule, tropics and
+  night side; one `Points` cloud of land dots; one ribbon mesh for every arc. No
+  post-processing.
+- **Halftone land.** `src/atlas/land-data.ts` (17 KB) is a dot every 0.25° along rows of
+  latitude, run-length encoded. Coarser 0.5° and 1° grids are subsets of it; the shader keeps
+  the halftone screen at a constant ~5 px on screen and skips the fine grids entirely when
+  zoomed out.
+- **DOM for everything you read.** Pins, labels, postcards, the graduated ring and the live
+  scale bar are HTML positioned from the same camera.
+- **It sleeps.** Nothing is drawn while you read a docked card (once the dashes settle, a few
+  seconds after you stop), while the paper sections cover the globe, or when the tab is
+  hidden. The slow turn on the title page stops after 25 s without input.
+- `?stats` in the URL exposes `window.__atlas.stats` (CPU per frame, draw calls).
 
 ## Structure
 
 ```
-index.html            all the content
-src/main.ts           photo viewer, clips that play in view, nav state, lazy-loads the swarm
-src/styles.css        the design system: paper, ink, one orange
-src/swarm/index.ts    renderer, drones, scroll → formation blend, cursor
-src/swarm/shapes.ts   the formations
-public/work/          project clips (960px, 30 s loops) and posters
-public/photos/        twelve photos at 800 and 1600px
+index.html                all the content
+src/main.ts               photo viewer, passport, clips, nav; starts the atlas
+src/styles.css            the atlas: paper, ink, route red, collaboration teal, travel ochre
+src/atlas/atlas.ts        the loop: scroll, drag, zoom, idle; picks plate or globe
+src/atlas/timeline.ts     scroll position → camera, arcs, lit pins
+src/atlas/places.ts       places, legs, and how each chapter frames the globe
+src/atlas/globe.ts        three.js globe (lazy)
+src/atlas/plate.ts        Canvas 2D globe (first frame, and no-WebGL)
+src/atlas/overlay.ts      pins, postcards, ring, scale bar
+src/atlas/geo.ts          vector and camera math shared by all three
+src/atlas/land.ts         decodes the land dots
+src/atlas/land-data.ts    generated land mask (Natural Earth, public domain)
+public/photos/thumb/      four 128 px pin thumbnails
 ```
+
+## Regenerating the land mask
+
+Done once, outside the project's dependencies: install `world-atlas@2` and
+`topojson-client@3` in a scratch folder, rasterise `land-50m.json` onto rows of latitude
+every 0.25° (even-odd scanlines, longitudes unwrapped across the antimeridian, Antarctica
+closed through the pole), run-length encode each row as LEB128 varints and base64 the
+result into `src/atlas/land-data.ts`.
 
 ## Commands
 
@@ -52,19 +83,20 @@ public/photos/        twelve photos at 800 and 1600px
 
 ## Editing
 
-- **Words, links, projects, photos** — `index.html`.
-- **A new chapter** — add an `<article class="chapter stage" data-stage="name">`
-  and a matching drawing in `buildFormations()` in `src/swarm/shapes.ts`.
-- **Clips** — re-encode new ones the same way:
-  `ffmpeg -i in.mp4 -t 30 -an -vf "scale='min(960,iw)':-2,fps=30" -c:v libx264 -preset slow -crf 30 -pix_fmt yuv420p -movflags +faststart out.mp4`
+- **Words, links, projects, photos**: `index.html`.
+- **A chapter**: add an `<article class="chapter" data-chapter="id">` with a `.card`, and its
+  camera stops in `CHAPTER_STOPS` in `src/atlas/places.ts`.
+- **A place or a photo pin**: `PLACES` in `src/atlas/places.ts`.
 
 ## Accessibility
 
-- Reduced motion: the swarm only moves when you scroll — no flocking, no arcs; clips only play on hover.
-- The canvas is `aria-hidden` and never takes pointer events.
-- Photos open in a native `<dialog>`; arrow keys step through them.
+- Reduced motion: no flights (the camera cuts between cities), no turning, no marching
+  dashes, no pulses; clips play only on hover.
+- The globe is `aria-hidden`; everything on it is also reachable as text (chapters, passport,
+  postcards).
+- Photos and the passport open in native `<dialog>`s; arrow keys step through photos.
 
 ## Deploying
 
-Static output — `npm run build` and serve `dist/`. On Vercel, import the repo;
-Vite is detected with no configuration.
+Static output: `npm run build` and serve `dist/`. On Vercel, Vite is detected with no
+configuration.
