@@ -1,107 +1,101 @@
 import "./styles.css";
+import { Film } from "./film/film";
+import { mountScrubber } from "./film/scrubber";
+import { mountFootage } from "./film/footage";
+import { mountGrain } from "./film/grain";
+import { Projector, stillItem } from "./film/projector";
+import { mountReel } from "./film/reel";
 
-/** Off the clock: the strip is plain HTML; this adds the arrows and the full-size viewer. */
-function wirePhotos() {
-  const strip = document.querySelector<HTMLElement>(".strip")!;
-  const links = Array.from(strip.querySelectorAll<HTMLAnchorElement>("a[data-caption]"));
+const film = new Film();
+const projector = new Projector(film.reduced);
+mountScrubber(film);
+mountFootage(film);
+const reel = mountReel(film, projector);
 
-  // the arrows step a frame at a time
-  document.querySelectorAll<HTMLButtonElement>(".strip-nav button").forEach((b) =>
-    b.addEventListener("click", () => {
-      const fig = strip.querySelector("figure");
-      const step = fig ? fig.getBoundingClientRect().width + 16 : 400;
-      strip.scrollBy({ left: Number(b.dataset.dir) * step, behavior: "smooth" });
-    }),
-  );
+// behind the scenes: the contact sheet projects a still
+const stills = Array.from(document.querySelectorAll<HTMLAnchorElement>("#sheet a"));
+const stillItems = stills.map(stillItem);
+stills.forEach((a, i) =>
+  a.addEventListener("click", (e) => {
+    if (e.metaKey || e.ctrlKey || e.shiftKey) return;
+    e.preventDefault();
+    projector.open(stillItems, i, a.getBoundingClientRect());
+  }),
+);
 
-  const viewer = document.querySelector<HTMLDialogElement>(".viewer")!;
-  const img = viewer.querySelector("img")!;
-  const cap = viewer.querySelector(".viewer-cap")!;
-  let current = 0;
-  const show = (i: number) => {
-    current = (i + links.length) % links.length;
-    const a = links[current];
-    img.src = a.href;
-    img.alt = a.querySelector("img")!.alt;
-    cap.textContent = a.dataset.caption!;
-  };
-  links.forEach((a, i) =>
-    a.addEventListener("click", (e) => {
-      if (e.metaKey || e.ctrlKey || e.shiftKey) return;
-      e.preventDefault();
-      show(i);
-      viewer.showModal();
-    }),
-  );
-  viewer.querySelector(".viewer-close")!.addEventListener("click", () => viewer.close());
-  viewer.addEventListener("click", (e) => {
-    if (e.target === viewer) viewer.close();
-  });
-  viewer.addEventListener("keydown", (e) => {
-    if (e.key === "ArrowRight") show(current + 1);
-    if (e.key === "ArrowLeft") show(current - 1);
-  });
-}
+film.start();
+mountGrain(film.reduced);
 
-/** Clips play only while you can see them, and not at all if you've asked for less motion. */
-function wireVideos() {
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const videos = document.querySelectorAll<HTMLVideoElement>(".card video");
-  if (reduced) {
-    videos.forEach((v) => {
-      v.parentElement!.addEventListener("pointerenter", () => v.play().catch(() => {}));
-      v.parentElement!.addEventListener("pointerleave", () => v.pause());
-    });
+// when nothing has moved for a few seconds, the grain stops too (no compositor work at rest)
+const root = document.documentElement;
+let idleT = 0;
+const wake = () => {
+  root.classList.remove("idle");
+  clearTimeout(idleT);
+  idleT = window.setTimeout(() => {
+    if (!film.playing) root.classList.add("idle");
+    else wake();
+  }, 6000);
+};
+for (const ev of ["scroll", "pointermove", "pointerdown", "keydown", "touchstart"]) addEventListener(ev, wake, { passive: true });
+wake();
+
+// Space plays the film; ← → cut between scenes (or frames, on the reel)
+addEventListener("keydown", (e) => {
+  if (projector.isOpen || e.metaKey || e.ctrlKey || e.altKey) return;
+  const t = e.target as HTMLElement;
+  const typing = t.closest("input, textarea, select, [contenteditable]");
+  const pressable = t.closest("button, a, summary, video");
+  if (e.key === " " && !typing && !pressable) {
+    e.preventDefault();
+    film.toggle();
     return;
   }
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const en of entries) {
-        const v = en.target as HTMLVideoElement;
-        if (en.isIntersecting) v.play().catch(() => {});
-        else v.pause();
-      }
-    },
-    { threshold: 0.6 },
-  );
-  videos.forEach((v) => io.observe(v));
+  if ((e.key === "ArrowRight" || e.key === "ArrowLeft") && !typing) {
+    const dir = e.key === "ArrowRight" ? 1 : -1;
+    film.pause();
+    const s = film.scenes[film.cur];
+    if (s.kind === "reel" && reel?.step(dir)) {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    film.step(dir);
+  }
+});
+
+// tabbing into a scene that isn't on screen cuts to it
+document.addEventListener("focusin", (e) => {
+  const t = e.target as Element;
+  if (t.closest("#clips")) return; // the reel brings its own clip to the gate
+  const s = film.sceneOf(t);
+  if (s && s.i !== film.cur) film.jumpTo(film.settle(s), false);
+});
+
+// in-page links cut to their scene
+document.addEventListener("click", (e) => {
+  const a = (e.target as Element).closest<HTMLAnchorElement>('a[href^="#"]');
+  if (!a || a.classList.contains("skip")) return;
+  const target = document.getElementById(a.hash.slice(1));
+  const s = film.sceneOf(target);
+  if (!s) return;
+  e.preventDefault();
+  film.pause();
+  if (s.kind === "open") film.jumpTo(0);
+  else film.jumpToScene(s.i);
+  history.replaceState(null, "", a.hash === "#open" ? location.pathname : a.hash);
+});
+document.querySelector(".skip")?.addEventListener("click", (e) => {
+  e.preventDefault();
+  const s = film.scenes.find((x) => x.kind === "credits");
+  if (s) film.jumpToScene(s.i, false);
+  (document.getElementById("roll")?.querySelector("a") as HTMLElement | null)?.focus();
+});
+
+// arriving on a #hash
+if (location.hash.length > 1) {
+  const s = film.sceneOf(document.getElementById(location.hash.slice(1)));
+  if (s) requestAnimationFrame(() => film.jumpToScene(s.i, false));
 }
 
-/** The 3D is a layer on top of a page that already works; load it once the page is up. */
-async function loadSwarm() {
-  const canvas = document.getElementById("swarm") as HTMLCanvasElement;
-  const probe = document.createElement("canvas").getContext("webgl2");
-  if (!probe) return;
-  await Promise.all([
-    document.fonts.load('700 100px "Geist Variable"'),
-    document.fonts.load('italic 400 100px "Instrument Serif"'),
-  ]).catch(() => {});
-  const { startSwarm } = await import("./swarm");
-  startSwarm(canvas);
-}
-
-/** The nav marks the section you're in. */
-function wireNav() {
-  const links = new Map(
-    Array.from(document.querySelectorAll<HTMLAnchorElement>(".nav nav a")).map((a) => [a.hash.slice(1), a]),
-  );
-  const io = new IntersectionObserver(
-    (entries) => {
-      for (const en of entries) {
-        if (!en.isIntersecting) continue;
-        links.forEach((a, id) => (id === en.target.id ? a.setAttribute("aria-current", "true") : a.removeAttribute("aria-current")));
-      }
-    },
-    { rootMargin: "-45% 0px -50% 0px" },
-  );
-  links.forEach((_, id) => {
-    const el = document.getElementById(id);
-    if (el) io.observe(el);
-  });
-}
-
-wirePhotos();
-wireNav();
-wireVideos();
-const idle = (window as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback ?? ((cb) => setTimeout(cb, 1));
-idle(() => void loadSwarm());
+if (import.meta.env.DEV) (window as unknown as { __f: Film }).__f = film;
