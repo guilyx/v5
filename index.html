@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Erwin Lejeune — Head of Robotics</title>
+    <meta
+      name="description"
+      content="Erwin Lejeune is Head of Robotics at SIRB.AI in Abu Dhabi. Fly the trajectory: eight years of robot autonomy, from a virtual STM32 to drone swarms, in one scroll."
+    />
+    <meta name="theme-color" content="#0b0c11" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Erwin Lejeune — Head of Robotics" />
+    <meta property="og:description" content="Fly the trajectory: eight years of robot autonomy, in one scroll." />
+    <meta property="og:image" content="/og.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <a class="skip" href="#top">Skip to content</a>
+
+    <div id="loader" role="status" aria-live="polite">
+      <svg class="loader-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <path d="M16 8.5 L8.5 21 L23.5 21" fill="none" stroke="currentColor" stroke-width="1.1" opacity="0.45" pathLength="1" />
+        <circle cx="16" cy="8.5" r="2.1" /><circle cx="8.5" cy="21" r="2.1" /><circle cx="23.5" cy="21" r="2.1" />
+      </svg>
+      <pre class="preflight" id="preflight">preflight</pre>
+    </div>
+
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div id="labels" aria-hidden="true"></div>
+
+    <header class="hud-top">
+      <a class="brand" href="#top" aria-label="guilyx — back to the start">
+        <svg viewBox="0 0 32 32" aria-hidden="true">
+          <path d="M16 8.5 L8.5 21 L23.5 21" fill="none" stroke="currentColor" stroke-width="1.1" opacity="0.45" />
+          <circle cx="16" cy="8.5" r="2.1" /><circle cx="8.5" cy="21" r="2.1" /><circle cx="23.5" cy="21" r="2.1" />
+        </svg>
+        <span>guilyx</span>
+      </a>
+      <button class="menu-btn" id="menu-btn" aria-expanded="false" aria-controls="rail">waypoints</button>
+    </header>
+
+    <nav id="rail" class="rail" aria-label="Chapters"></nav>
+    <div class="telemetry" id="telemetry" aria-hidden="true"></div>
+
+    <main id="content"></main>
+
+    <div id="lightbox" class="lightbox" hidden role="dialog" aria-modal="true" aria-label="Photo">
+      <button class="lb-close" aria-label="Close">close</button>
+      <button class="lb-prev" aria-label="Previous photo">←</button>
+      <figure><img alt="" /><figcaption></figcaption></figure>
+      <button class="lb-next" aria-label="Next photo">→</button>
+    </div>
+
+    <noscript>
+      <p class="noscript">This version is a flight that needs JavaScript. The readable one is at <a href="https://v4.elejeune.me">v4.elejeune.me</a>.</p>
+    </noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
