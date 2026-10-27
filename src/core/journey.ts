@@ -144,7 +144,7 @@ export class Journey {
     const p = this.posCurve.getPoint(t);
     this.lookTarget.copy(this.lookCurve.getPoint(t));
     p.sub(this.lookTarget).multiplyScalar(this.fitScale).add(this.lookTarget);
-    if (snap) this.look.copy(this.lookTarget);
+    if (snap || this.reduced) this.look.copy(this.lookTarget);
     else this.look.lerp(this.lookTarget, 1 - Math.exp(-8 * dt));
 
     if (pointer && !this.reduced) {
