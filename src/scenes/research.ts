@@ -243,7 +243,7 @@ export function createResearch(env: SceneEnv): Scene {
       {
         id: "research",
         vh: 170,
-        keys: [key(-6, 46, 46, 9, 2, -4), key(-24, 15, 32, -36, 5, 2), key(-4, 17, 6, -6, 11, -24)],
+        keys: [key(-6, 46, 46, 9, 2, -4), key(-34, 22, 36, -16, 8, -8), key(-16, 16, 10, 0, 11, -24)],
       },
     ],
     clickables: papers.map((p) => ({ object: p, onClick: () => open(p.userData.url, "_blank", "noopener") })),

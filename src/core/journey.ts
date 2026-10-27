@@ -15,7 +15,12 @@ interface StopRuntime {
  * splines, one for position and one for where it looks. The camera chases
  * the scroll with exponential damping, so a flick of the wheel turns into a
  * glide instead of a jump.
+ *
+ * Each stop dwells on its own keys for most of its scroll and only spends the
+ * last stretch (TRANSIT) flying to the next stop, so a panel and the scene it
+ * describes are on screen together.
  */
+export const TRANSIT = 0.22;
 export class Journey {
   private posCurve!: THREE.CatmullRomCurve3;
   private lookCurve!: THREE.CatmullRomCurve3;
@@ -26,9 +31,8 @@ export class Journey {
 
   /** Damped position along the key list, in key units. */
   idx = 0;
-  /** Lets the final shot pull back and slide over so the whole route fits the screen. */
+  /** Lets the final shot pull back far enough for the whole route to fit the screen. */
   fitScale = 1;
-  readonly fitShift = new THREE.Vector3();
   private target = 0;
   private velocity = 0;
   private look = new THREE.Vector3();
@@ -85,7 +89,12 @@ export class Journey {
         const nextTop = j + 1 < n ? this.stops[j + 1].top : this.maxScroll;
         const nextStart = j + 1 < n ? this.stops[j + 1].start : this.nKeys - 1;
         const t = clamp((y - s.top) / Math.max(1, nextTop - s.top));
-        return s.start + t * (nextStart - s.start);
+        const last = nextStart - 1; // this stop's own last key
+        if (j + 1 >= n) return s.start + t * (nextStart - s.start);
+        if (last <= s.start) return s.start + smoothstep(1 - TRANSIT, 1, t) * (nextStart - s.start);
+        const dwell = clamp(t / (1 - TRANSIT));
+        const fly = clamp((t - (1 - TRANSIT)) / TRANSIT);
+        return s.start + dwell * (last - s.start) + fly * (nextStart - last);
       }
     }
     return 0;
@@ -133,8 +142,8 @@ export class Journey {
   private place(dt: number, snap: boolean, pointer?: THREE.Vector2) {
     const t = clamp(this.idx / (this.nKeys - 1));
     const p = this.posCurve.getPoint(t);
-    this.lookTarget.copy(this.lookCurve.getPoint(t)).add(this.fitShift);
-    p.add(this.fitShift).sub(this.lookTarget).multiplyScalar(this.fitScale).add(this.lookTarget);
+    this.lookTarget.copy(this.lookCurve.getPoint(t));
+    p.sub(this.lookTarget).multiplyScalar(this.fitScale).add(this.lookTarget);
     if (snap) this.look.copy(this.lookTarget);
     else this.look.lerp(this.lookTarget, 1 - Math.exp(-8 * dt));
 

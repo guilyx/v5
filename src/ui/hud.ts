@@ -78,7 +78,7 @@ export class Hud {
       const p = this.panels[i];
       const s = (y - p.top) / p.h;
       const fin = i === 0 ? 1 : smoothstep(-0.03, 0.1, s);
-      const fout = p.last ? 1 : 1 - smoothstep(0.82, 0.95, s);
+      const fout = p.last ? 1 : 1 - smoothstep(0.74, 0.86, s);
       const o = fin * fout;
       const str = o.toFixed(3);
       if (p.el.style.getPropertyValue("--o") !== str) {
@@ -117,5 +117,6 @@ export class Hud {
       this.telemetry.textContent = t;
       this.lastTele = t;
     }
+    this.telemetry.style.opacity = String(1 - smoothstep(0.96, 0.99, progress));
   }
 }

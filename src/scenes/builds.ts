@@ -7,16 +7,18 @@ import { key, type CamKey, type Scene, type SceneEnv, type StopDef } from "./typ
 /**
  * Selected Builds. Every screen plays a real clip recorded from the project
  * running. Screens hang at the altitude the project runs at — in the field,
- * in the loop, on the metal — so the flight descends as it goes.
+ * in the loop, on the metal — so the flight descends as it goes. Each tier
+ * is an arc of screens around one spot; the camera turns from one to the next.
  * Clips load only when you get close, and only the one you're facing plays.
  */
 const TIERS: { layer: Layer; y: number; side: 1 | -1; z0: number }[] = [
   { layer: "field", y: 34, side: 1, z0: 0 },
-  { layer: "agent", y: 19, side: -1, z0: -70 },
-  { layer: "machine", y: 6, side: 1, z0: -118 },
+  { layer: "agent", y: 19, side: -1, z0: -56 },
+  { layer: "machine", y: 6, side: 1, z0: -112 },
 ];
-const SPACING = 24;
+const RADIUS = 27;
 const SW = 15;
+const DEG = Math.PI / 180;
 
 export function createBuilds(env: SceneEnv): Scene {
   const f = env.world.frame(1, 0.55);
@@ -38,13 +40,15 @@ export function createBuilds(env: SceneEnv): Scene {
   TIERS.forEach((tier) => {
     const keys: CamKey[] = [];
     const members = builds.map((b, i) => ({ b, i })).filter(({ b }) => b.layer === tier.layer);
+    const C = new THREE.Vector3(0, tier.y, tier.z0);
     members.forEach(({ b, i }, k) => {
-      const z = tier.z0 - k * SPACING;
-      const x = tier.side * 12;
+      // around the arc, from ahead toward the side the panel isn't on
+      const phi = tier.side * (18 + k * 40) * DEG;
+      const d = new THREE.Vector3(Math.sin(phi), 0, -Math.cos(phi));
       const h = SW / b.aspect;
       const holder = new THREE.Group();
-      holder.position.set(x, tier.y, z);
-      holder.rotation.y = -tier.side * 0.34;
+      holder.position.copy(C).addScaledVector(d, RADIUS);
+      holder.rotation.y = Math.atan2(-d.x, -d.z);
       group.add(holder);
 
       const frame = blueprint(new THREE.BoxGeometry(SW + 0.8, h + 0.8, 0.4), { fill: ink.deep, edge: ink.muted });
@@ -67,18 +71,18 @@ export function createBuilds(env: SceneEnv): Scene {
       screens.push({ i, mesh, mat, posterLoaded: false });
       order.push(i);
 
-      // the shot: square-on, the screen off to the side the panel isn't on
-      const normal = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), holder.rotation.y);
-      const center = holder.position.clone();
-      const pos = center.clone().addScaledVector(normal, 24).add(new THREE.Vector3(0, 1.2, 0));
-      const look = center.clone().add(new THREE.Vector3(-tier.side * 4.5, 0, -2));
+      // the shot: from the arc's centre, turned a little short of the screen
+      // so it lands on the side the panel isn't on
+      const lookPhi = phi - tier.side * 10 * DEG;
+      const pos = C.clone().addScaledVector(d, 3).add(new THREE.Vector3(0, 1.2, 0));
+      const look = C.clone().add(new THREE.Vector3(Math.sin(lookPhi), 0, -Math.cos(lookPhi)).multiplyScalar(RADIUS));
       keys.push(key(pos.x, pos.y, pos.z, look.x, look.y, look.z));
     });
     stops.push({ id: `builds-${tier.layer}`, vh: 60 + keys.length * 45, keys });
   });
 
   TIERS.forEach((t) =>
-    env.labels.add("builds", anchor(group, -t.side * 4, t.y + 9, t.z0 + 10), `${layers[t.layer]} · ${t.y} m`, {
+    env.labels.add("builds", anchor(group, t.side * 6, t.y + 12, t.z0 - 20), `${layers[t.layer]} · ${t.y} m`, {
       cls: "tag",
       maxDist: 120,
     }),

@@ -86,7 +86,7 @@ export function createHarness(env: SceneEnv): Scene {
     ],
     update(ctx) {
       // the change leads the camera through the gates
-      const cz = 22 + (END - 14 - 22) * smoothstep(0.02, 0.92, ctx.u);
+      const cz = 22 + (END - 14 - 22) * smoothstep(0.02, 0.8, ctx.u);
       change.position.set(GX, GY + Math.sin(ctx.time * 3) * 0.3, cz);
       cube.rotation.set(ctx.time * 1.2, ctx.time * 0.9, 0);
       hist.unshift(change.position.clone());

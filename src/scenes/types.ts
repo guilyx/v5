@@ -28,16 +28,16 @@ export interface StopDef {
 }
 
 /**
- * Progress through one of a scene's stops, 0..1, from the scene-wide `u`.
- * Stops share the scene's span in proportion to how many keys they hold.
+ * Progress through one of a scene's stops, 0..1, from the scene-wide `u`:
+ * 0 at the stop's first key, 1 at its last — the end of its dwell, before
+ * the camera leaves for the next stop.
  */
 export function stopProgress(stops: StopDef[], u: number, i: number): number {
   const total = stops.reduce((n, s) => n + s.keys.length, 0);
   let before = 0;
   for (let j = 0; j < i; j++) before += stops[j].keys.length;
-  const a = before / total;
-  const b = (before + stops[i].keys.length) / total;
-  return Math.min(1, Math.max(0, (u - a) / (b - a)));
+  const k = u * total - before;
+  return Math.min(1, Math.max(0, k / Math.max(1, stops[i].keys.length - 1)));
 }
 
 export interface FrameCtx {

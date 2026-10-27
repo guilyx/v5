@@ -48,7 +48,7 @@ export function createField(env: SceneEnv): Scene {
                 new THREE.Vector3(d, hgt, w * 0.92),
               ),
             );
-            productColors.push(tones[Math.floor(r() * tones.length)].clone().multiplyScalar(0.35 + r() * 0.35));
+            productColors.push(tones[Math.floor(r() * tones.length)].clone().multiplyScalar(0.22 + r() * 0.26));
           }
           z += w + 0.08;
         }
@@ -179,6 +179,18 @@ export function createField(env: SceneEnv): Scene {
 
   const dir = new THREE.Vector3();
   const tmpBoxes = boxes.map((b) => ({ ...b }));
+  // the robot's progress along its plan, as a function of the scene's scroll
+  const driveAt = (u: number) => smoothstep(-0.25, 1.05, u) * 0.94 + 0.03;
+  // a chase camera: keys placed behind and above where the robot will be
+  const chase = (u: number) => {
+    const p = plan.at(driveAt(u));
+    const d = plan.dir(driveAt(u));
+    // look a little to the robot's left so it sits right of the panel
+    const lx = d.z * 7;
+    const lz = -d.x * 7;
+    return key(p.x - d.x * 13 + lx * 0.4, 15, p.z - d.z * 13 + lz * 0.4, p.x + d.x * 7 + lx, 1.5, p.z + d.z * 7 + lz);
+  };
+  const CHASE = 6;
   const trolleyBox = { x0: 0, x1: 0, z0: 0, z1: 0 };
 
   return {
@@ -187,13 +199,13 @@ export function createField(env: SceneEnv): Scene {
     stops: [
       {
         id: "field",
-        vh: 170,
-        keys: [key(40, 48, 52, -6, 0, 0), key(6, 7, 38, 4, 3, -12), key(-36, 34, -38, -10, 0, -4)],
+        vh: 190,
+        keys: [key(40, 48, 52, -6, 0, 0), ...Array.from({ length: CHASE }, (_, i) => chase((i + 1) / (CHASE + 1)))],
       },
     ],
     update(ctx) {
       // the robot drives as you scroll, and idles forward a touch so it never looks parked
-      const drive = smoothstep(-0.25, 1.05, ctx.u) * 0.94 + 0.03 + Math.sin(ctx.time * 0.6) * 0.002;
+      const drive = driveAt(ctx.u) + Math.sin(ctx.time * 0.6) * 0.002;
       plan.at(drive, robot.position);
       plan.dir(drive, dir);
       robot.rotation.y = Math.atan2(-dir.x, -dir.z);

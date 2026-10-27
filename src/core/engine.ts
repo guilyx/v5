@@ -74,6 +74,7 @@ export class Engine {
 
     this.camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 6000);
     this.camera.position.set(0, 20, 60);
+    this.resize();
 
     const hemi = new THREE.HemisphereLight(0xc8cce0, 0x0b0c11, 1.1);
     const key = new THREE.DirectionalLight(0xffffff, 1.4);
@@ -106,6 +107,15 @@ export class Engine {
     const w = innerWidth;
     const h = innerHeight;
     this.camera.aspect = w / h;
+    // Portrait: the panel takes the bottom of the screen, so widen the lens
+    // and move the centre of projection up — subjects land above the text.
+    if (w < h) {
+      this.camera.fov = 72;
+      this.camera.setViewOffset(w, h, 0, h * 0.15, w, h);
+    } else {
+      this.camera.fov = 50;
+      this.camera.clearViewOffset();
+    }
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h, false);
     this.composer?.setSize(w, h);

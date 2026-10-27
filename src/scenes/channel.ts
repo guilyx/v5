@@ -81,15 +81,10 @@ export function createChannel(env: SceneEnv): Scene {
 
 const REVEAL_D = 1420;
 
-/**
- * How far the last shot has to pull back to fit the whole mark on this
- * screen. On a narrow screen the panel takes the bottom half, so the mark
- * also slides up out of its way.
- */
-export function revealFit(aspect: number, amount: number) {
-  const tanHalf = Math.tan(THREE.MathUtils.degToRad(25));
-  const need = Math.max(REVEAL_D, 1500 / (2 * tanHalf * aspect));
-  const scale = 1 + amount * (need / REVEAL_D - 1);
-  const shiftZ = aspect < 1 ? amount * 0.24 * 2 * need * tanHalf : 0;
-  return { scale, shiftZ };
+/** How far the last shot has to pull back to fit the whole mark on this screen. */
+export function revealFit(aspect: number, fovDeg: number, amount: number) {
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(fovDeg / 2));
+  const base = REVEAL_D * (Math.tan(THREE.MathUtils.degToRad(25)) / tanHalf);
+  const need = Math.max(base, 1500 / (2 * tanHalf * aspect));
+  return 1 + amount * (need / REVEAL_D - 1);
 }

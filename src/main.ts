@@ -42,7 +42,8 @@ async function boot() {
     // No WebGL: the page still reads top to bottom.
     document.documentElement.classList.add("no-gl");
     const main = document.getElementById("content")!;
-    renderSections(main, scenesForText());
+    const hud = new Hud(document.getElementById("rail")!, renderSections(main, scenesForText()));
+    hud.onJump = (id) => document.getElementById(id)?.scrollIntoView();
     document.getElementById("loader")!.classList.add("done");
     return;
   }
@@ -127,6 +128,8 @@ async function boot() {
   await new Promise((r) => setTimeout(r, reduced ? 0 : 450));
   document.getElementById("loader")!.classList.add("done");
 
+  if (import.meta.env.DEV) Object.assign(window, { __v5: { engine, journey, scenes } });
+
   let last = performance.now();
   let time = 0;
   const tmp = new THREE.Vector3();
@@ -136,9 +139,7 @@ async function boot() {
     time += dt * (reduced ? 0.35 : 1);
     engine.adapt(dt);
 
-    const fit = revealFit(engine.camera.aspect, smoothstep(0.6, 0.95, journey.u[scenes.length - 1]));
-    journey.fitScale = fit.scale;
-    journey.fitShift.set(0, 0, fit.shiftZ);
+    journey.fitScale = revealFit(engine.camera.aspect, engine.camera.fov, smoothstep(0.6, 0.95, journey.u[scenes.length - 1]));
     journey.update(dt, pointer);
     const active = journey.activeScene();
 

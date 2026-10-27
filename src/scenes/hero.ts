@@ -84,8 +84,8 @@ export function createHero(env: SceneEnv): Scene {
   pad.add(pulse);
   group.add(pad);
 
-  env.labels.add("hero", anchor(group, 0, 0.5, -76), "heading 329° · leg 1 of 2", { cls: "year", maxDist: 200 });
-  env.labels.add("hero", anchor(group, 52, 0.5, 52), "range 70 m", { maxDist: 200 });
+  env.labels.add("hero", anchor(group, 0, 0.5, -76), "heading 329° · leg 1 of 2", { cls: "year deco", maxDist: 200 });
+  env.labels.add("hero", anchor(group, 52, 0.5, 52), "range 70 m", { cls: "deco", maxDist: 200 });
 
   const flockCenter = new THREE.Vector3();
   let step = 0;
