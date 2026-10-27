@@ -3,7 +3,7 @@
   "type": "module",
   "version": "5.0.0",
   "private": true,
-  "description": "v5 of Erwin Lejeune's portfolio — a career, drawn by a swarm of drones in three.js",
+  "description": "v5 of Erwin Lejeune's portfolio — a night drone show over Abu Dhabi, in three.js",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
