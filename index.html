@@ -6,469 +6,506 @@
     <title>Erwin Lejeune — Head of Robotics</title>
     <meta
       name="description"
-      content="Erwin Lejeune builds robots that work as a team. Head of Robotics at SIRB.AI in Abu Dhabi — eight years of autonomy, from one maze robot to drone swarms."
+      content="Erwin Lejeune, Head of Robotics at SIRB.AI in Abu Dhabi. Eight years in robotics, laid out as the things on his desk, from 2014 to now."
     />
-    <meta name="theme-color" content="#f3f0e8" />
+    <meta name="theme-color" content="#efe6d6" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="Erwin Lejeune — Head of Robotics" />
-    <meta property="og:description" content="I build robots that work as a team. A career, drawn by a swarm of drones." />
+    <meta property="og:title" content="Erwin Lejeune — The Desk" />
+    <meta property="og:description" content="Eight years in robotics, laid out on a desk. Pick anything up." />
     <meta property="og:image" content="https://v5.elejeune.me/og.jpg" />
     <meta property="og:url" content="https://v5.elejeune.me" />
     <meta name="twitter:card" content="summary_large_image" />
+    <script>
+      // decide the layout before first paint: the immersive desk needs WebGL2 and JS
+      (function () {
+        try {
+          var c = document.createElement("canvas");
+          if (c.getContext("webgl2")) document.documentElement.classList.add("has-desk");
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
-    <a class="skip" href="#journey">Skip to the journey</a>
+    <a class="skip" href="#read">Skip to the readable version</a>
 
-    <!-- the swarm draws behind everything; the page reads fine without it -->
-    <canvas id="swarm" aria-hidden="true"></canvas>
+    <!-- the desk renders behind everything; every word on this page is plain HTML -->
+    <canvas id="desk" aria-hidden="true"></canvas>
+    <div class="desk-shade" aria-hidden="true"></div>
 
-    <header class="nav">
-      <a class="nav-name" href="#top">Erwin Lejeune</a>
+    <header class="top">
+      <a class="brand" href="#top" aria-label="Erwin Lejeune, back to the start">
+        <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
+          <path d="M16 7.5 L7.5 22 L24.5 22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          <circle cx="16" cy="7.5" r="3" fill="currentColor" />
+          <circle cx="7.5" cy="22" r="3" fill="currentColor" />
+          <circle cx="24.5" cy="22" r="3" class="dot" />
+        </svg>
+        <span>Erwin Lejeune</span>
+      </a>
       <nav aria-label="Sections">
-        <a href="#journey">Journey</a>
+        <a href="#journey" class="nav-desk">Desk</a>
         <a href="#work">Work</a>
-        <a href="#writing">Writing</a>
+        <a href="#writing" class="nav-writing">Writing</a>
         <a href="#photos">Photos</a>
-        <a class="nav-cta" href="#contact">Contact</a>
+        <a href="#contact">Contact</a>
       </nav>
+      <button type="button" class="light-btn" hidden aria-live="polite">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <circle cx="12" cy="12" r="4.2" fill="currentColor" />
+          <g stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M5.3 18.7l1.5-1.5M17.2 6.8l1.5-1.5" />
+          </g>
+        </svg>
+        <span class="light-label">Light</span>
+      </button>
     </header>
 
-    <main>
-      <section id="top" class="hero stage" data-stage="murmur">
-        <div class="col-text">
+    <main id="main">
+      <section id="top" class="station hero" data-station="hero" aria-labelledby="hero-title">
+        <div class="card hero-card">
           <p class="eyebrow">
-            <img src="/avatar.webp" alt="" width="40" height="40" />
-            <span>Head of Robotics at <a href="https://sirb.ai/">SIRB.AI</a> · Abu Dhabi</span>
+            <img src="/avatar.webp" alt="Erwin Lejeune" width="44" height="44" />
+            <span><b>Erwin Lejeune</b><br />Head of Robotics, SIRB.AI · Abu Dhabi</span>
           </p>
-          <h1>I build robots that work as a <em>team</em>.</h1>
+          <h1 id="hero-title">Eight years in robotics, <em>laid out on a desk.</em></h1>
           <p class="lede">
-            Eight years of autonomy, from one robot solving a maze to swarms of drones flying a mission together. I lead the
-            team, and I still write the code.
+            I lead robotics software teams across orchestration, navigation and fault management, and I still write the
+            code: ROS 2, C++, Python, Go. Everything I worked on is on this desk, left to right, from 2014 to now.
           </p>
+          <ul class="howto desk-only" aria-label="How to explore">
+            <li><span class="key">Scroll</span> to move along the desk, through time</li>
+            <li><span class="key">Click</span> anything to pick it up · <span class="key">Esc</span> puts it back</li>
+            <li><span class="key">Drag</span> the desk to slide along it</li>
+          </ul>
           <div class="actions">
-            <a class="btn" href="#journey">See the journey</a>
-            <a class="btn btn-quiet" href="mailto:erwin.lejeune15@gmail.com">Email me</a>
+            <a class="btn" href="#c-school">Start in 2014</a>
+            <a class="btn btn-quiet" href="#contact">Get in touch</a>
           </div>
         </div>
-        <p class="hint">A swarm of tiny drones, flocking in your browser. Move your cursor through it.</p>
       </section>
 
-      <section id="journey" class="journey" aria-labelledby="journey-title">
-        <header class="section-head">
-          <h2 id="journey-title">The journey</h2>
-          <p>Scroll, and the swarm draws each chapter.</p>
-        </header>
+      <div id="journey" class="journey">
+        <h2 class="sr-only">The journey, 2014 to now</h2>
 
-        <article class="chapter stage" data-stage="chip">
-          <div class="col-text">
-            <p class="when"><span>2018</span> Hiventive · Bordeaux</p>
-            <h3>Starting at the chip</h3>
+        <article id="c-school" class="station" data-station="school" data-year="2014" aria-labelledby="t-school">
+          <div class="card">
+            <p class="when"><span class="yr">2014–2021</span><span class="where">Nantes · Bordeaux, France</span></p>
+            <h3 id="t-school">Electronics first, then robots</h3>
             <p>
-              I wrote a virtual STM32 microcontroller in SystemC: timers, I2C, CAN, GPIO and USART, all running under QEMU.
-              Testing against a model of the hardware first became a habit I never dropped.
+              A B.Sc. in electronics engineering at Nantes Université, then two master's degrees: computer engineering and
+              aeronautics at Ynov Bordeaux, and control and robotics at Ecole Centrale de Nantes.
             </p>
-            <ul class="facts">
-              <li><b>SystemC</b> virtual prototype</li>
-              <li><b>QEMU</b> integration</li>
-            </ul>
+            <div class="more">
+              <ul class="degrees">
+                <li><b>B.Sc. Electronics Engineering</b><span>Nantes Université · 2014–2018</span></li>
+                <li><b>M.Sc. Computer Engineering &amp; Aeronautics</b><span>Ynov Bordeaux · 2018–2019</span></li>
+                <li><b>M.Sc. Control &amp; Robotics</b><span>Ecole Centrale de Nantes · 2019–2021</span></li>
+              </ul>
+            </div>
+            <button type="button" class="pick desk-only" data-obj="books">Pick up the books</button>
           </div>
-          <p class="formation">Formation 01 — the chip</p>
         </article>
 
-        <article class="chapter stage" data-stage="maze">
-          <div class="col-text">
-            <p class="when"><span>2019</span> Ingeniarius · Coimbra</p>
-            <h3>First robots, first wins</h3>
+        <article id="c-hiventive" class="station" data-station="hiventive" data-year="2018" aria-labelledby="t-hiventive">
+          <div class="card">
+            <p class="when"><span class="yr">2018–2019</span><span class="where">Hiventive · Bordeaux, France</span></p>
+            <p class="role">Embedded Software Engineer</p>
+            <h3 id="t-hiventive">Starting at the chip</h3>
             <p>
-              Full autonomy stacks with ROS on small robots, built from scratch. They won both maze competitions: the one
-              with a map, and the one without.
+              I built a virtual prototype of an STM32 microcontroller in SystemC/TLM, with its timers, I2C, CAN, GPIO and
+              USART peripherals, running inside QEMU.
+            </p>
+            <div class="more">
+              <blockquote>
+                The lesson I kept: treat time, memory and bandwidth as a budget, and test against a model of the hardware
+                first.
+              </blockquote>
+            </div>
+            <ul class="facts">
+              <li><b>SystemC/TLM</b> virtual prototype</li>
+              <li><b>QEMU</b> integration</li>
+            </ul>
+            <button type="button" class="pick desk-only" data-obj="board">Pick up the board</button>
+          </div>
+        </article>
+
+        <article id="c-coimbra" class="station" data-station="coimbra" data-year="2019" aria-labelledby="t-coimbra">
+          <div class="card">
+            <p class="when"><span class="yr">2019</span><span class="where">Ingeniarius · Coimbra, Portugal</span></p>
+            <p class="role">Robotics Assistant</p>
+            <h3 id="t-coimbra">Two mazes, two wins</h3>
+            <p>
+              Full autonomy stacks built from scratch, with ROS and embedded systems. We won both maze-solving
+              competitions: the mapped one and the unmapped one.
             </p>
             <ul class="facts">
               <li><b>2 of 2</b> maze competitions won</li>
+              <li><b>ROS</b> + embedded, from scratch</li>
             </ul>
+            <button type="button" class="pick desk-only" data-obj="maze">Pick up the maze</button>
           </div>
-          <p class="formation">Formation 02 — a maze, and the path through it</p>
         </article>
 
-        <article class="chapter stage" data-stage="paths">
-          <div class="col-text">
-            <p class="when"><span>2020</span> Centrale Nantes</p>
-            <h3>Planning, and two papers</h3>
+        <article id="c-centrale" class="station" data-station="centrale" data-year="2020" aria-labelledby="t-centrale">
+          <div class="card">
+            <p class="when"><span class="yr">2020–2021</span><span class="where">Ecole Centrale de Nantes, France</span></p>
+            <p class="role">Robotics Researcher</p>
+            <h3 id="t-centrale">Four projects, two papers</h3>
             <p>
-              Four research projects: multi-agent pathfinding, PDDL planning, real-time ROS on Xenomai, and ROS 2 latency.
-              I've had a soft spot for planning problems ever since.
+              I led four research projects: multi-agent pathfinding, AI planning with PDDL, real-time ROS control on
+              Xenomai/XDDP, and ROS 2 latency benchmarking.
             </p>
+            <div class="more">
+              <ul class="papers">
+                <li>
+                  <a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions"
+                    >Survey of the Multi-Agent Pathfinding Solutions</a
+                  ><span>Preprint · 2021</span>
+                </li>
+                <li>
+                  <a href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case"
+                    >Real-time Jitter Measurements under ROS2: the Inverted Pendulum Case</a
+                  ><span>Preprint · 2021</span>
+                </li>
+              </ul>
+              <p class="aside">
+                <b>At the same time, remote for Hiventive (2020–2021):</b> backend services in Go with PostgreSQL and Docker
+                for a computer-aided production engineering platform, and an automated programming-test manager for
+                candidate evaluation.
+              </p>
+            </div>
             <ul class="facts">
-              <li>
-                <a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions"
-                  ><b>Paper</b> Survey of multi-agent pathfinding</a
-                >
-              </li>
-              <li>
-                <a
-                  href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case"
-                  ><b>Paper</b> Real-time jitter under ROS 2</a
-                >
-              </li>
+              <li><b>4</b> research projects</li>
+              <li><b>2</b> papers</li>
             </ul>
+            <button type="button" class="pick desk-only" data-obj="papers">Read the papers</button>
           </div>
-          <p class="formation">Formation 03 — three agents sharing a grid, no collisions</p>
         </article>
 
-        <article class="chapter stage" data-stage="cart">
-          <div class="col-text">
-            <p class="when"><span>2021</span> Coalescent · Odense</p>
-            <h3>A robot in a real supermarket</h3>
+        <article id="c-coalescent" class="station" data-station="coalescent" data-year="2021" aria-labelledby="t-coalescent">
+          <div class="card">
+            <p class="when"><span class="yr">2021–2022</span><span class="where">Coalescent Mobile Robotics · Odense, Denmark</span></p>
+            <p class="role">Founding Robotics Engineer</p>
+            <h3 id="t-coalescent">A robot in a real supermarket</h3>
             <p>
-              I built the navigation for a robot working store aisles: path planning, motion control and localization.
-              When the CTO left, I took over navigation and trolley detection, hired our first interns, and ran the sprints.
+              Part of the founding technical team that delivered the first working in-store robot. I led the navigation
+              stack (path planning, motion control, localization) and worked on perception: detection, filtering,
+              tracking.
             </p>
+            <div class="more">
+              <p>
+                After the CTO left, I led navigation and trolley detection: I recruited and trained interns and a junior
+                engineer, ran planning, and turned the CEO's requirements into sprints.
+              </p>
+              <blockquote>A real store changes your priorities fast.</blockquote>
+            </div>
             <ul class="facts">
-              <li><b>Founding</b> robotics engineer</li>
+              <li><b>Founding</b> technical team</li>
               <li><b>First</b> team I led</li>
             </ul>
+            <button type="button" class="pick desk-only" data-obj="trolley">Pick up the trolley</button>
           </div>
-          <p class="formation">Formation 04 — the other thing in the aisle</p>
         </article>
 
-        <article class="chapter stage" data-stage="bird">
-          <div class="col-text">
-            <p class="when"><span>2022</span> Technology Innovation Institute · Abu Dhabi</p>
-            <h3>From one robot to many</h3>
+        <article id="c-tii" class="station" data-station="tii" data-year="2022" aria-labelledby="t-tii">
+          <div class="card">
+            <p class="when"><span class="yr">2022–2024</span><span class="where">Technology Innovation Institute · Abu Dhabi</span></p>
+            <p class="role">Senior Engineer, Robotics Software</p>
+            <h3 id="t-tii">From one robot to many</h3>
             <p>
-              Multi-robot orchestration and new swarm behaviours, including a decentralized, bird-inspired flocking method
-              we published at IROS. The live demos brought in USD 3M in contracts.
+              R&amp;D on multi-robot orchestration, collaboration and control. I designed new swarm behaviours, including
+              decentralized bird-inspired flocking, published at IEEE/RSJ IROS 2024.
             </p>
+            <div class="more">
+              <p>I ran the live demos for partners. The project led to USD 3M in contracts.</p>
+              <ul class="papers">
+                <li>
+                  <a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking"
+                    >Decentralized Acceleration-Based Bird-Inspired Flocking</a
+                  ><span>IEEE/RSJ IROS 2024</span>
+                </li>
+              </ul>
+            </div>
             <ul class="facts">
-              <li>
-                <a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking"
-                  ><b>IROS 2024</b> Bird-inspired flocking</a
-                >
-              </li>
-              <li><b>$3M</b> in contracts</li>
+              <li><b>IROS 2024</b> paper</li>
+              <li><b>USD 3M</b> in contracts</li>
             </ul>
+            <button type="button" class="pick desk-only" data-obj="drone">Pick up the drone</button>
           </div>
-          <p class="formation">Formation 05 — where the flocking idea came from</p>
         </article>
 
-        <article class="chapter stage" data-stage="minus">
-          <div class="col-text">
-            <p class="when"><span>2024</span> Technology Innovation Institute · Abu Dhabi</p>
-            <h3>Leading the team</h3>
+        <article id="c-lead" class="station" data-station="lead" data-year="2024" aria-labelledby="t-lead">
+          <div class="card">
+            <p class="when"><span class="yr">2024–2026</span><span class="where">Technology Innovation Institute · Abu Dhabi</span></p>
+            <p class="role">Team Lead, Robotics Software</p>
+            <h3 id="t-lead">Leading the team</h3>
             <p>
-              I grew and led a team of nine across autonomy, infrastructure and integration. We overhauled the swarm stack,
-              ran a joint program with Caltech, and our demos led to more than USD 10M in contracts.
+              I grew and led a team of 9 engineers across autonomy, infrastructure and platform integration. We overhauled
+              the swarm autonomy architecture.
             </p>
+            <div class="more">
+              <p>
+                A joint program with Caltech on M4, their multi-modal robot that flies and rolls, and on their humanoid,
+                including outdoor planning and tracking for M4. Demos to companies in Europe and the UAE led to more than
+                USD 10M in contracts. I also started building AI tooling for the team.
+              </p>
+            </div>
             <ul class="facts">
               <li><b>−74%</b> onboard CPU</li>
-              <li><b>−52%</b> bandwidth</li>
+              <li><b>−52%</b> network bandwidth</li>
               <li><b>9</b> engineers</li>
             </ul>
+            <button type="button" class="pick desk-only" data-obj="notes">Pick up the sticky notes</button>
           </div>
-          <p class="formation">Formation 06 — the CPU we gave back to the drones</p>
         </article>
 
-        <article class="chapter stage" data-stage="network">
-          <div class="col-text">
-            <p class="when"><span>2024</span> Unchained Labs</p>
-            <h3>Starting a company</h3>
+        <article id="c-unchained" class="station" data-station="unchained" data-year="2024" aria-labelledby="t-unchained">
+          <div class="card">
+            <p class="when"><span class="yr">2024–now</span><span class="where">Unchained Labs · remote</span></p>
+            <p class="role">Founder</p>
+            <h3 id="t-unchained">Say it, and it gets built</h3>
             <p>
-              AI agents that run on a company's own models, data and machines, and Kymatics, a graph-based orchestrator
-              that turns a spoken request into a queue of jobs.
+              Local-first AI agents that run on a company's own models, data and infrastructure. Kymatics is graph-based
+              agent orchestration: a spoken intent becomes a queue of build jobs.
             </p>
+            <div class="more">
+              <p>
+                How I use AI in engineering: it lets a team ship more without lowering the bar, and the real work is the
+                harness around it. Every change goes draft → AI review → checks → quiz (“can you explain your diff?”) →
+                human review → ship, whoever or whatever wrote it.
+              </p>
+              <p class="links">
+                <a href="https://unchainedlabs.dev/">unchainedlabs.dev</a>
+                <a href="https://github.com/Unchained-Labs">GitHub</a>
+              </p>
+            </div>
             <ul class="facts">
-              <li><a href="https://unchainedlabs.dev/"><b>unchainedlabs.dev</b></a></li>
               <li><b>Local-first</b> agents</li>
+              <li><b>Voice</b> → build jobs</li>
             </ul>
+            <button type="button" class="pick desk-only" data-obj="mic">Pick up the microphone</button>
           </div>
-          <p class="formation">Formation 07 — a graph of agents</p>
         </article>
 
-        <article class="chapter stage" data-stage="sphere">
-          <div class="col-text">
-            <p class="when"><span>2026</span> SIRB.AI · Abu Dhabi</p>
-            <h3>Head of Robotics</h3>
+        <article id="c-sirb" class="station" data-station="sirb" data-year="2026" aria-labelledby="t-sirb">
+          <div class="card">
+            <p class="when"><span class="yr">Feb 2026–now</span><span class="where">SIRB.AI · Abu Dhabi</span></p>
+            <p class="role">Head of Robotics</p>
+            <h3 id="t-sirb"><span lang="ar">سرب</span>, a flock</h3>
             <p>
-              Founding team. I designed the robotics architecture and a self-healing layer: when something fails, the
-              swarm notices and recovers on its own. We launched publicly at UMEX 2026.
+              Founding team. I designed the robotics software architecture and the autonomy roadmap, and built a
+              self-healing autonomy layer: swarm-wide fault and state recording, agents that detect and recover from
+              failures, ML-based mission scoring before launch.
             </p>
+            <div class="more">
+              <p>
+                We took the stack from prototype to public launch at UMEX 2026, where it was unveiled as the Middle East's
+                first AI-powered swarm platform. <i>Sirb</i> is Arabic for a flock, or a swarm.
+              </p>
+            </div>
             <ul class="facts">
-              <li><b>Self-healing</b> swarm autonomy</li>
-              <li><b>UMEX 2026</b> launch</li>
+              <li><b>UMEX 2026</b> public launch</li>
+              <li><b>Self-healing</b> autonomy</li>
             </ul>
+            <button type="button" class="pick desk-only" data-obj="badge">Pick up the badge</button>
           </div>
-          <p class="formation">Formation 08 — a sirb, Arabic for a swarm</p>
         </article>
-      </section>
 
-      <section id="work" class="work stage" data-stage="park" aria-labelledby="work-title">
-        <header class="section-head">
-          <h2 id="work-title">Things I build on my own time</h2>
-          <p>All open source. Every clip was recorded from the real thing running.</p>
-        </header>
-        <div class="cards">
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/grip.webp" src="/work/grip.mp4"></video>
-            <div class="card-body">
+        <article id="c-after" class="station" data-station="after" data-year="now" aria-labelledby="t-after">
+          <div class="card">
+            <p class="when"><span class="yr">After hours</span><span class="where">The end of the desk</span></p>
+            <h3 id="t-after">What's left on the desk</h3>
+            <p>
+              Things I build on my own time, photos I took, notes I wrote, and my card. Off the clock: basketball, films,
+              photography, and Clanker Labs, my self-hosted home with an agent running it.
+            </p>
+            <div class="after-picks desk-only">
+              <button type="button" class="pick" data-obj="laptop">Open the laptop</button>
+              <button type="button" class="pick" data-obj="photos">Flip through the photos</button>
+              <button type="button" class="pick" data-obj="notebook">Open the notebook</button>
+              <button type="button" class="pick" data-obj="card">Take my card</button>
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div id="read" class="sheets">
+        <section id="work" class="sheet" aria-labelledby="work-title">
+          <header class="sheet-head">
+            <p class="kicker">On the laptop</p>
+            <h2 id="work-title">Things I build on my own time</h2>
+            <p>Open source. Every clip is a recording of the real thing running.</p>
+          </header>
+          <div class="projects">
+            <article class="project" data-key="grip">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/grip.webp" src="/work/grip.mp4"></video></div>
               <h3>grip</h3>
-              <p>A git hook that quizzes you on your own diff before you push. AI can write the code; someone still has to understand it.</p>
-              <p class="tags">Python · LLM grading · Git hooks</p>
+              <p>A git hook that quizzes you on your own diff before you commit or push, grades the answers against a hidden rubric, and blocks anything below the pass mark.</p>
               <p class="links"><a href="https://github.com/guilyx/grip">Code</a><a href="https://guilyx.github.io/grip/">Docs</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/pymapf.webp" src="/work/pymapf.mp4"></video>
-            <div class="card-body">
+            </article>
+            <article class="project" data-key="pymapf">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/pymapf.webp" src="/work/pymapf.mp4"></video></div>
               <h3>PyMAPF</h3>
-              <p>Multi-agent pathfinding on any graph: CBS, PIBT, LaCAM and MAPF-LNS, with the search drawn live as it runs.</p>
-              <p class="tags">Python · Planning · Graph search</p>
-              <p class="links">
-                <a href="https://github.com/APLA-Toolbox/pymapf">Code</a><a href="https://apla-toolbox.github.io/pymapf/">Playground</a>
-              </p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/kymatics.webp" src="/work/kymatics.mp4"></video>
-            <div class="card-body">
-              <h3>Kymatics</h3>
-              <p>Say what you want built, and a graph of local agents turns it into a queue of build jobs.</p>
-              <p class="tags">Rust · Python · Agents · Voice</p>
-              <p class="links"><a href="https://github.com/Unchained-Labs">Code</a><a href="https://unchainedlabs.dev/">Unchained Labs</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/flybots.webp" src="/work/flybots.mp4"></video>
-            <div class="card-body">
-              <h3>flybots</h3>
-              <p>Multirotor, fixed-wing and VTOL flight from first principles, with 40+ simulations and a gym for teaching a drone to fly.</p>
-              <p class="tags">Python · Flight dynamics · RL</p>
-              <p class="links"><a href="https://github.com/guilyx/flybots">Code</a><a href="https://guilyx.github.io/flybots/">Site</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/rostree.webp" src="/work/rostree.mp4"></video>
-            <div class="card-body">
-              <h3>rostree</h3>
-              <p>Explore a ROS 2 dependency graph from the terminal, a TUI, or one HTML file that still opens on an offline robot.</p>
-              <p class="tags">Python · ROS 2 · Graphs</p>
-              <p class="links"><a href="https://github.com/guilyx/rostree">Code</a><a href="https://guilyx.github.io/rostree">Site</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/jupyddl.webp" src="/work/jupyddl.mp4"></video>
-            <div class="card-body">
+              <p>Multi-agent pathfinding on arbitrary graphs: CBS, PIBT, LaCAM, MAPF-LNS, plus multi-agent RL. The solvers stream their search live.</p>
+              <p class="links"><a href="https://github.com/APLA-Toolbox/pymapf">Code</a><a href="https://apla-toolbox.github.io/pymapf/">Site</a></p>
+            </article>
+            <article class="project" data-key="jupyddl">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/jupyddl.webp" src="/work/jupyddl.mp4"></video></div>
               <h3>PythonPDDL</h3>
-              <p>A dependency-free PDDL planner: parser, grounder, 14 planners and heuristics you can train on your own plans.</p>
-              <p class="tags">Python · PDDL · Heuristic search</p>
-              <p class="links">
-                <a href="https://github.com/APLA-Toolbox/pythonpddl">Code</a><a href="https://apla-toolbox.github.io/PythonPDDL/">Workbench</a>
-              </p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/roue.webp" src="/work/roue.mp4"></video>
-            <div class="card-body">
+              <p>A dependency-free PDDL framework: hand-written parser and grounder, 14 planners, LM-cut and FF heuristics, and heuristics you can train.</p>
+              <p class="links"><a href="https://github.com/APLA-Toolbox/pythonpddl">Code</a><a href="https://apla-toolbox.github.io/PythonPDDL/">Site</a></p>
+            </article>
+            <article class="project" data-key="flybots">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/flybots.webp" src="/work/flybots.mp4"></video></div>
+              <h3>flybots</h3>
+              <p>Multirotor, fixed-wing and VTOL flight physics from scratch, with 40+ runnable simulations and an RL gym.</p>
+              <p class="links"><a href="https://github.com/guilyx/flybots">Code</a><a href="https://guilyx.github.io/flybots/">Site</a></p>
+            </article>
+            <article class="project" data-key="rostree">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/rostree.webp" src="/work/rostree.mp4"></video></div>
+              <h3>rostree</h3>
+              <p>Explores a ROS 2 dependency graph (a DAG, not a tree) from the command line, a TUI, or a self-contained HTML file.</p>
+              <p class="links"><a href="https://github.com/guilyx/rostree">Code</a><a href="https://guilyx.github.io/rostree">Site</a></p>
+            </article>
+            <article class="project" data-key="roue">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/roue.webp" src="/work/roue.mp4"></video></div>
               <h3>roue</h3>
-              <p>A radial file converter for the Linux desktop. Right-click a file, pick a format, done. Fully offline.</p>
-              <p class="tags">Python · GTK 4 · FFmpeg</p>
+              <p>An offline file converter for the Linux desktop: Ctrl+Shift+right-click a file, pick a format on a wheel, and the result lands next to the original.</p>
               <p class="links"><a href="https://github.com/guilyx/roue">Code</a><a href="https://guilyx.github.io/roue/">Site</a></p>
-            </div>
-          </article>
-          <article class="card">
-            <video muted loop playsinline preload="none" poster="/work/clanker-labs.webp" src="/work/clanker-labs.mp4"></video>
-            <div class="card-body">
+            </article>
+            <article class="project" data-key="kymatics">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/kymatics.webp" src="/work/kymatics.mp4"></video></div>
+              <h3>Kymatics <span>Unchained Labs</span></h3>
+              <p>Turns a spoken intent into a queue of build jobs, with local-first agents.</p>
+              <p class="links"><a href="https://github.com/Unchained-Labs">Code</a><a href="https://unchainedlabs.dev/">Site</a></p>
+            </article>
+            <article class="project" data-key="clanker-labs">
+              <div class="clip"><video muted loop playsinline preload="none" poster="/work/clanker-labs.webp" src="/work/clanker-labs.mp4"></video></div>
               <h3>Clanker Labs</h3>
-              <p>A self-hosted home for notes, mail, media and money, kept running by an agent instead of a sysadmin.</p>
-              <p class="tags">Ansible · Docker · MCP</p>
-              <p class="links">
-                <a href="https://github.com/Clanker-Labs">Code</a><a href="https://clanker-labs.github.io/clanker-labs-public/">Site</a>
-              </p>
+              <p>Self-host your home (notes, mail, media, passwords, money) on hardware you own, with an agent in front so it doesn't need a sysadmin.</p>
+              <p class="links"><a href="https://github.com/Clanker-Labs">Code</a><a href="https://clanker-labs.github.io/clanker-labs-public/">Site</a></p>
+            </article>
+          </div>
+          <div class="also">
+            <h3>Also</h3>
+            <ul>
+              <li><a href="https://marketplace.visualstudio.com/items?itemName=rangonomics.btview">BTView</a><span>A visual behavior-tree editor for BehaviorTree.CPP, inside VS Code and Cursor.</span></li>
+              <li><a href="https://github.com/guilyx/jarvis_ros2">jarvis_ros2</a><span>Fault and recovery management for ROS 2 robots.</span></li>
+              <li><a href="https://github.com/guilyx/awesome-daily-minigames">awesome-daily-minigames</a><span>281 daily puzzle games.</span></li>
+            </ul>
+          </div>
+        </section>
+
+        <section id="writing" class="sheet" aria-labelledby="writing-title">
+          <header class="sheet-head">
+            <p class="kicker">In the notebook</p>
+            <h2 id="writing-title">Papers, notes and upstream code</h2>
+          </header>
+          <div class="columns">
+            <div>
+              <h3>Notes</h3>
+              <ul class="entries">
+                <li><a href="https://v4.elejeune.me/blog/pi-voice-assistant">A homemade Alexa, and the agents that will hack my house</a><span>Oct 2026</span></li>
+                <li><a href="https://v4.elejeune.me/blog/btview">BTView: behavior trees you can actually review</a><span>Aug 2026</span></li>
+                <li><a href="https://v4.elejeune.me/blog/rostree">rostree: exploring a graph instead of drawing a tree</a><span>Aug 2026</span></li>
+                <li><a href="https://v4.elejeune.me/blog/zucman">zucman: a data-viz kit for a tax policy argument</a><span>Aug 2026</span></li>
+              </ul>
             </div>
-          </article>
-        </div>
-      </section>
+            <div>
+              <h3>Papers</h3>
+              <ul class="entries">
+                <li><a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking">Decentralized Acceleration-Based Bird-Inspired Flocking</a><span>IEEE/RSJ IROS 2024</span></li>
+                <li><a href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case">Real-time Jitter Measurements under ROS2: the Inverted Pendulum Case</a><span>Preprint · 2021</span></li>
+                <li><a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions">Survey of the Multi-Agent Pathfinding Solutions</a><span>Preprint · 2021</span></li>
+              </ul>
+            </div>
+            <div>
+              <h3>Merged upstream</h3>
+              <ul class="entries">
+                <li><a href="https://github.com/ros-navigation/navigation2/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">ros-navigation/navigation2</a><span>The ROS 2 navigation stack</span></li>
+                <li><a href="https://github.com/AtsushiSakai/PythonRobotics/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">AtsushiSakai/PythonRobotics</a><span>Robotics algorithms in Python</span></li>
+                <li><a href="https://github.com/TheAlgorithms/Python/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">TheAlgorithms/Python</a><span>Algorithms in Python</span></li>
+              </ul>
+            </div>
+          </div>
+        </section>
 
-      <section id="writing" class="writing stage" data-stage="park" aria-labelledby="writing-title">
-        <header class="section-head">
-          <h2 id="writing-title">Papers, open source, notes</h2>
-        </header>
-        <div class="lists">
-          <div>
-            <h3>Papers</h3>
-            <ul>
-              <li>
-                <a href="https://www.researchgate.net/publication/387418977_Decentralized_Acceleration-Based_Bird-Inspired_Flocking"
-                  >Decentralized acceleration-based bird-inspired flocking</a
-                ><span>IROS 2024</span>
-              </li>
-              <li>
-                <a href="https://www.researchgate.net/publication/350353690_Real-time_Jitter_Measurements_under_ROS2_the_Inverted_Pendulum_case"
-                  >Real-time jitter measurements under ROS 2</a
-                ><span>Preprint · 2021</span>
-              </li>
-              <li>
-                <a href="https://www.researchgate.net/publication/348716625_Survey_of_the_Multi-Agent_Pathfinding_Solutions"
-                  >Survey of multi-agent pathfinding solutions</a
-                ><span>Preprint · 2021</span>
-              </li>
+        <section id="photos" class="sheet" aria-labelledby="photos-title">
+          <header class="sheet-head">
+            <p class="kicker">The polaroids</p>
+            <h2 id="photos-title">Photos I took</h2>
+            <p>My own photos: California and the US West, Paris, Togo, the Maldives.</p>
+          </header>
+          <ul class="polaroids">
+            <li><a href="/photos/yosemite-landscape-1600.webp" data-photo="yosemite-landscape" data-caption="Yosemite, California"><img src="/photos/yosemite-landscape-800.webp" width="1600" height="1069" alt="Yosemite valley, California" loading="lazy" decoding="async" /><span>Yosemite, California</span></a></li>
+            <li><a href="/photos/clinton-ball-1600.webp" data-photo="clinton-ball" data-caption="Clinton ball, USA"><img src="/photos/clinton-ball-800.webp" width="1600" height="1069" alt="Basketball at Clinton, USA" loading="lazy" decoding="async" /><span>Clinton ball, USA</span></a></li>
+            <li><a href="/photos/grand-canyon-1600.webp" data-photo="grand-canyon" data-caption="Grand Canyon, USA"><img src="/photos/grand-canyon-800.webp" width="1069" height="1600" alt="Grand Canyon, USA" loading="lazy" decoding="async" /><span>Grand Canyon, USA</span></a></li>
+            <li><a href="/photos/paris-monument-1600.webp" data-photo="paris-monument" data-caption="Monument, Paris"><img src="/photos/paris-monument-800.webp" width="1600" height="1069" alt="A monument in Paris" loading="lazy" decoding="async" /><span>Monument, Paris</span></a></li>
+            <li><a href="/photos/togo-cooking-girls-clors-1600.webp" data-photo="togo-cooking-girls-clors" data-caption="Cooking, in colour — Togo"><img src="/photos/togo-cooking-girls-clors-800.webp" width="1238" height="827" alt="Cooking, in colour, Togo" loading="lazy" decoding="async" /><span>Cooking, in colour — Togo</span></a></li>
+            <li><a href="/photos/pavel-zion-happy-1600.webp" data-photo="pavel-zion-happy" data-caption="Pavel, happy — Zion, USA"><img src="/photos/pavel-zion-happy-800.webp" width="1600" height="1069" alt="Pavel, happy, in Zion, USA" loading="lazy" decoding="async" /><span>Pavel, happy — Zion</span></a></li>
+            <li><a href="/photos/parisbaguette-1600.webp" data-photo="parisbaguette" data-caption="Paris Baguette — Paris"><img src="/photos/parisbaguette-800.webp" width="1069" height="1600" alt="Paris Baguette, Paris" loading="lazy" decoding="async" /><span>Paris Baguette — Paris</span></a></li>
+            <li><a href="/photos/santabarabarapier-1600.webp" data-photo="santabarabarapier" data-caption="The pier — Santa Barbara"><img src="/photos/santabarabarapier-800.webp" width="1600" height="1069" alt="The pier, Santa Barbara" loading="lazy" decoding="async" /><span>The pier — Santa Barbara</span></a></li>
+            <li><a href="/photos/skating-santa-monica-1600.webp" data-photo="skating-santa-monica" data-caption="Skating — Santa Monica"><img src="/photos/skating-santa-monica-800.webp" width="1069" height="1600" alt="Skating, Santa Monica" loading="lazy" decoding="async" /><span>Skating — Santa Monica</span></a></li>
+            <li><a href="/photos/maldives-hanging-shel-1600.webp" data-photo="maldives-hanging-shel" data-caption="Hanging shells — Maldives"><img src="/photos/maldives-hanging-shel-800.webp" width="1600" height="1069" alt="Hanging shells, Maldives" loading="lazy" decoding="async" /><span>Hanging shells — Maldives</span></a></li>
+            <li><a href="/photos/cathedral-lakes-1600.webp" data-photo="cathedral-lakes" data-caption="Cathedral Lakes, USA"><img src="/photos/cathedral-lakes-800.webp" width="1600" height="1069" alt="Cathedral Lakes, USA" loading="lazy" decoding="async" /><span>Cathedral Lakes, USA</span></a></li>
+            <li><a href="/photos/zion-trail-1600.webp" data-photo="zion-trail" data-caption="Zion trail — Zion"><img src="/photos/zion-trail-800.webp" width="1600" height="1069" alt="A trail in Zion" loading="lazy" decoding="async" /><span>Zion trail — Zion</span></a></li>
+          </ul>
+        </section>
+
+        <section id="contact" class="sheet sheet-contact" aria-labelledby="contact-title">
+          <div class="envelope">
+            <p class="kicker">My card</p>
+            <h2 id="contact-title">Write to me</h2>
+            <p>A question about swarms, multi-agent planning, an open-source idea, or just hello.</p>
+            <p class="email"><a href="mailto:erwin.lejeune15@gmail.com">erwin.lejeune15@gmail.com</a></p>
+            <ul class="elsewhere">
+              <li><a href="https://github.com/guilyx">GitHub<span>guilyx</span></a></li>
+              <li><a href="https://www.linkedin.com/in/erwinlejeune-lkn">LinkedIn<span>erwinlejeune-lkn</span></a></li>
+              <li><a href="https://www.researchgate.net/profile/Erwin-Lejeune">ResearchGate<span>Erwin-Lejeune</span></a></li>
+              <li><a href="https://resume.elejeune.me">Résumé<span>resume.elejeune.me</span></a></li>
             </ul>
           </div>
-          <div>
-            <h3>Upstream</h3>
-            <ul>
-              <li>
-                <a href="https://github.com/ros-navigation/navigation2/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">ros-navigation/navigation2</a
-                ><span>The ROS 2 navigation stack</span>
-              </li>
-              <li>
-                <a href="https://github.com/AtsushiSakai/PythonRobotics/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">AtsushiSakai/PythonRobotics</a
-                ><span>Robotics algorithms, animated</span>
-              </li>
-              <li>
-                <a href="https://github.com/TheAlgorithms/Python/pulls?q=is%3Apr+author%3Aguilyx+is%3Amerged">TheAlgorithms/Python</a
-                ><span>Graph search algorithms</span>
-              </li>
-            </ul>
-          </div>
-          <div>
-            <h3>Notes</h3>
-            <ul>
-              <li><a href="https://v4.elejeune.me/blog/pi-voice-assistant">A homemade Alexa, and the agents that will hack my house</a><span>Oct 2026</span></li>
-              <li><a href="https://v4.elejeune.me/blog/btview">BTView: behavior trees you can actually review</a><span>Aug 2026</span></li>
-              <li><a href="https://v4.elejeune.me/blog/rostree">rostree: exploring a graph instead of drawing a tree</a><span>Aug 2026</span></li>
-              <li><a href="https://v4.elejeune.me/blog/zucman">zucman: a data-viz kit for a tax policy argument</a><span>Aug 2026</span></li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section id="photos" class="photos stage" data-stage="park" aria-labelledby="photos-title">
-        <header class="section-head">
-          <h2 id="photos-title">Off the clock</h2>
-          <p>Basketball, road trips, and whatever's in front of the camera.</p>
-        </header>
-        <div class="strip" tabindex="0" aria-label="Photos — scroll sideways">
-          <figure>
-            <a href="/photos/yosemite-landscape-1600.webp" data-caption="Yosemite · California">
-              <img src="/photos/yosemite-landscape-800.webp" srcset="/photos/yosemite-landscape-800.webp 800w, /photos/yosemite-landscape-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Yosemite, California" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Yosemite</b> · California</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/clinton-ball-1600.webp" data-caption="Clinton ball · USA">
-              <img src="/photos/clinton-ball-800.webp" srcset="/photos/clinton-ball-800.webp 800w, /photos/clinton-ball-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Clinton ball, USA" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Clinton ball</b> · USA</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/grand-canyon-1600.webp" data-caption="Grand Canyon · USA">
-              <img src="/photos/grand-canyon-800.webp" srcset="/photos/grand-canyon-800.webp 800w, /photos/grand-canyon-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1069" height="1600" alt="Grand Canyon, USA" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Grand Canyon</b> · USA</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/paris-monument-1600.webp" data-caption="Monument · Paris">
-              <img src="/photos/paris-monument-800.webp" srcset="/photos/paris-monument-800.webp 800w, /photos/paris-monument-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Monument, Paris" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Monument</b> · Paris</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/togo-cooking-girls-clors-1600.webp" data-caption="Cooking, in colour · Togo">
-              <img src="/photos/togo-cooking-girls-clors-800.webp" srcset="/photos/togo-cooking-girls-clors-800.webp 800w, /photos/togo-cooking-girls-clors-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1238" height="827" alt="Cooking, in colour, Togo" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Cooking, in colour</b> · Togo</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/pavel-zion-happy-1600.webp" data-caption="Pavel, happy · Zion">
-              <img src="/photos/pavel-zion-happy-800.webp" srcset="/photos/pavel-zion-happy-800.webp 800w, /photos/pavel-zion-happy-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Pavel, happy, Zion" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Pavel, happy</b> · Zion</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/parisbaguette-1600.webp" data-caption="Paris Baguette · Paris">
-              <img src="/photos/parisbaguette-800.webp" srcset="/photos/parisbaguette-800.webp 800w, /photos/parisbaguette-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1069" height="1600" alt="Paris Baguette, Paris" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Paris Baguette</b> · Paris</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/santabarabarapier-1600.webp" data-caption="The pier · Santa Barbara">
-              <img src="/photos/santabarabarapier-800.webp" srcset="/photos/santabarabarapier-800.webp 800w, /photos/santabarabarapier-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="The pier, Santa Barbara" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>The pier</b> · Santa Barbara</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/skating-santa-monica-1600.webp" data-caption="Skating · Santa Monica">
-              <img src="/photos/skating-santa-monica-800.webp" srcset="/photos/skating-santa-monica-800.webp 800w, /photos/skating-santa-monica-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1069" height="1600" alt="Skating, Santa Monica" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Skating</b> · Santa Monica</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/maldives-hanging-shel-1600.webp" data-caption="Hanging shells · Maldives">
-              <img src="/photos/maldives-hanging-shel-800.webp" srcset="/photos/maldives-hanging-shel-800.webp 800w, /photos/maldives-hanging-shel-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Hanging shells, Maldives" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Hanging shells</b> · Maldives</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/cathedral-lakes-1600.webp" data-caption="Cathedral Lakes · USA">
-              <img src="/photos/cathedral-lakes-800.webp" srcset="/photos/cathedral-lakes-800.webp 800w, /photos/cathedral-lakes-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Cathedral Lakes, USA" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Cathedral Lakes</b> · USA</figcaption>
-          </figure>
-          <figure>
-            <a href="/photos/zion-trail-1600.webp" data-caption="Zion trail · Zion">
-              <img src="/photos/zion-trail-800.webp" srcset="/photos/zion-trail-800.webp 800w, /photos/zion-trail-1600.webp 1600w" sizes="(max-width: 900px) 80vw, 40vw"
-                   width="1600" height="1069" alt="Zion trail, Zion" loading="lazy" decoding="async" />
-            </a>
-            <figcaption><b>Zion trail</b> · Zion</figcaption>
-          </figure>
-        </div>
-        <div class="strip-nav">
-          <button type="button" data-dir="-1" aria-label="Previous photos">←</button>
-          <button type="button" data-dir="1" aria-label="Next photos">→</button>
-        </div>
-      </section>
-
-      <section id="contact" class="contact stage" data-stage="hello" aria-labelledby="contact-title">
-        <div class="col-text">
-          <h2 id="contact-title">Say <em>hello</em>.</h2>
-          <p>
-            I'm not looking for a new role, but I read everything. A question about multi-agent planning, an open-source
-            idea, or just hi.
-          </p>
-          <div class="actions">
-            <a class="btn" href="mailto:erwin.lejeune15@gmail.com">erwin.lejeune15@gmail.com</a>
-            <a class="btn btn-quiet" href="https://resume.elejeune.me">Résumé</a>
-          </div>
-          <p class="socials">
-            <a href="https://github.com/guilyx">GitHub</a>
-            <a href="https://www.linkedin.com/in/erwinlejeune-lkn">LinkedIn</a>
-            <a href="https://www.researchgate.net/profile/Erwin-Lejeune">ResearchGate</a>
-          </p>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
 
-    <footer class="footer">
-      <p>© 2026 Erwin Lejeune · Built with three.js</p>
-      <p><a href="https://v4.elejeune.me">Previous version</a></p>
+    <footer class="foot">
+      <p>© 2026 Erwin Lejeune · Built from scratch with three.js, no framework.</p>
+      <p><a href="https://v4.elejeune.me">The previous version</a></p>
     </footer>
 
+    <!-- the timeline along the bottom edge: where you are on the desk -->
+    <nav class="ruler desk-only" aria-label="Jump to a year" hidden>
+      <div class="ruler-track">
+        <span class="ruler-cursor" aria-hidden="true"></span>
+      </div>
+    </nav>
+
+    <!-- what you're holding: filled from the content above -->
+    <aside class="hand" aria-labelledby="hand-title" hidden>
+      <div class="hand-paper" tabindex="-1">
+        <p class="hand-kicker">In your hand</p>
+        <h2 id="hand-title" class="hand-title"></h2>
+        <div class="hand-body"></div>
+        <div class="hand-foot">
+          <button type="button" class="btn btn-quiet hand-back">Put it back <kbd>Esc</kbd></button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="tag" aria-hidden="true"><b></b><span></span></div>
+
     <dialog class="viewer" aria-label="Photo">
-      <img alt="" />
-      <p class="viewer-cap"></p>
-      <button type="button" class="viewer-close" aria-label="Close">Close</button>
+      <figure>
+        <img alt="" />
+        <figcaption></figcaption>
+      </figure>
+      <div class="viewer-nav">
+        <button type="button" data-dir="-1" aria-label="Previous photo">←</button>
+        <button type="button" class="viewer-close">Close</button>
+        <button type="button" data-dir="1" aria-label="Next photo">→</button>
+      </div>
     </dialog>
 
     <script type="module" src="/src/main.ts"></script>

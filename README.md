@@ -1,44 +1,58 @@
-# elejeune.me — v5
+# elejeune.me — v5 · The Desk
 
-A career, drawn by a swarm of drones.
+Eight years in robotics, laid out on a desk.
 
 ![v5](public/og.jpg)
 
-About a thousand small quadcopters flock in the hero and scatter around your
-cursor. Scroll, and they fly into a new formation for each chapter: the chip I
-started on, the maze my robots solved, the shopping cart from the supermarket
-robot, the bird behind the flocking paper, the CPU we gave back to the drones,
-a graph of agents, and a sphere for SIRB.AI — *sirb* is Arabic for a swarm.
+A long oak desk under tall windows. Scrolling slides along it from left to right,
+2014 to now, and every chapter of the career is an object on it: the textbooks,
+an STM32-style dev board, a maze with its little robot and two trophies, the two
+preprints and a fountain pen, a toy trolley next to an in-store robot, a
+quadcopter beside the IROS 2024 paper, three sticky notes (−74% CPU, −52%
+bandwidth, team of 9), a microphone and a notepad for Kymatics, and the UMEX 2026
+badge with a paper flock (*sirb*, Arabic for a flock). At the end of the desk: a
+laptop that plays the side projects, his polaroids, a notebook, his card.
 
-The words are plain HTML in their own column. The swarm never sits behind text.
+Hover an object and it lifts with its label. Click it and it comes up to you,
+turning gently in your hand, with its story on a sheet of paper beside it. Escape
+puts it back. Drag the desk to slide along it. The window light follows your
+local time of day (the sun button changes it).
 
 ## How it's built
 
-- **Page first.** `index.html` holds every word and link; it reads fine with no
-  JavaScript and no WebGL. The page's own script is under 2 KB.
-- **3D second.** three.js loads lazily once the page is idle. One instanced
-  mesh, no post-processing, no physics engine.
-- **Formations are drawings.** Each chapter's shape is drawn on a small
-  offscreen canvas (ink in black, the highlight in red) and sampled on a hex
-  grid, so drones sit evenly like a real drone show. See `src/swarm/shapes.ts`.
-- **Scroll drives it directly.** The scroll position picks the two formations
-  to blend and how far along; nothing eases the scroll itself, so the swarm
-  answers the wheel straight away. A stiff spring per drone just rounds off the
-  motion.
-- **It sleeps.** While you read the project grid the drones are parked above
-  the page and the canvas stops rendering.
-- **About 0.35 ms of CPU per frame** for the whole swarm, measured in dev.
+- **Page first.** `index.html` holds every word and link and reads fine with no
+  JavaScript or no WebGL (the cards simply stack). The 3D never invents text: the
+  paper you read while holding something is cloned from the page's own HTML.
+- **3D second.** three.js is imported lazily after the first paint. Before it
+  arrives the page already shows the cards on a plain oak background.
+- **One soft sun.** A single shadow-casting directional light shines through a
+  real window wall, so its glazing bars draw soft lines across the desk. The
+  shadow map is not redrawn every frame: only when something moves (a lifted
+  object, a change of light, or the camera travelling far enough along the desk).
+- **Render on demand.** No frame is drawn unless something changed: scroll, the
+  pointer, a spring, a video frame (via `requestVideoFrameCallback`). Idle, the
+  page costs nothing.
+- **Baked objects.** Every object is built from rounded boxes and lathes, then
+  merged by material, so a station costs 25–45 draw calls.
+- **Scroll is direct.** Scroll position maps straight to a place on the desk; a
+  ~80 ms smoothing rounds the motion off. No scroll hijacking.
 
 ## Structure
 
 ```
-index.html            all the content
-src/main.ts           photo viewer, clips that play in view, nav state, lazy-loads the swarm
-src/styles.css        the design system: paper, ink, one orange
-src/swarm/index.ts    renderer, drones, scroll → formation blend, cursor
-src/swarm/shapes.ts   the formations
-public/work/          project clips (960px, 30 s loops) and posters
-public/photos/        twelve photos at 800 and 1600px
+index.html                 all the content
+src/main.ts                fonts, page wiring, lazy-loads the desk
+src/styles.css             paper, oak, ink: the whole design system
+src/ui/                    photo viewer, clips that play in view, nav state
+src/desk/index.ts          renderer, the frame loop, hover / pick up / drag
+src/desk/rig.ts            the camera dolly: scroll → place on the desk
+src/desk/light.ts          sun, sky and room light for each time of day
+src/desk/world.ts          the desk, the window wall, the sky
+src/desk/props.ts          what makes an object pickable
+src/desk/hand.ts           the paper you read while holding something
+src/desk/objects/*.ts      every object on the desk, chapter by chapter
+public/work/               project clips (960px, 30 s loops) and posters
+public/photos/             twelve photos at 800 and 1600px
 ```
 
 ## Commands
@@ -50,21 +64,13 @@ public/photos/        twelve photos at 800 and 1600px
 | `npm run build`   | Typecheck, then build to `./dist/` |
 | `npm run preview` | Preview the build                  |
 
-## Editing
-
-- **Words, links, projects, photos** — `index.html`.
-- **A new chapter** — add an `<article class="chapter stage" data-stage="name">`
-  and a matching drawing in `buildFormations()` in `src/swarm/shapes.ts`.
-- **Clips** — re-encode new ones the same way:
-  `ffmpeg -i in.mp4 -t 30 -an -vf "scale='min(960,iw)':-2,fps=30" -c:v libx264 -preset slow -crf 30 -pix_fmt yuv420p -movflags +faststart out.mp4`
+Add `?perf` to the URL to expose `window.__desk.stats` (CPU time per frame, draw
+calls, triangles). `?light=morning|midday|golden|evening` pins the light.
 
 ## Accessibility
 
-- Reduced motion: the swarm only moves when you scroll — no flocking, no arcs; clips only play on hover.
-- The canvas is `aria-hidden` and never takes pointer events.
-- Photos open in a native `<dialog>`; arrow keys step through them.
-
-## Deploying
-
-Static output — `npm run build` and serve `dist/`. On Vercel, import the repo;
-Vite is detected with no configuration.
+- Every object can be picked up from its card with the keyboard ("Pick up …"
+  buttons); focus moves to the story and comes back on Escape.
+- Reduced motion: no smoothing, no swaying, no spinning props, clips only play
+  when you open the laptop.
+- The canvas is `aria-hidden`; all text is real HTML on solid paper.
