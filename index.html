@@ -6,13 +6,13 @@
     <title>Erwin Lejeune — Head of Robotics</title>
     <meta
       name="description"
-      content="Erwin Lejeune, Head of Robotics at SIRB.AI in Abu Dhabi. His site is a maze: send a small robot through eight years of robotics, one room per chapter."
+      content="Erwin Lejeune, Head of Robotics at SIRB.AI in Abu Dhabi. His site is a maze: send a toy M4, a robot that rolls and flies, through eight years of robotics, one room per chapter."
     />
     <meta name="theme-color" content="#e9e0d0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Erwin Lejeune — Head of Robotics" />
-    <meta property="og:description" content="A portfolio you solve: a small robot plans its way through a maze, one room per chapter." />
+    <meta property="og:description" content="A portfolio you solve: a robot that rolls and flies plans its way through a maze, one room per chapter." />
     <meta property="og:image" content="https://v5.elejeune.me/og.jpg" />
     <meta property="og:url" content="https://v5.elejeune.me" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -57,21 +57,67 @@
     </div>
 
     <p class="hint" id="hint" aria-hidden="true">
-      <span class="hint-mouse">Click the floor to send the robot · scroll for the next room</span>
-      <span class="hint-touch">Tap to drive · swipe up for the next room</span>
+      <span class="hint-mouse">Hover to preview a plan · click to go · F to fly · scroll for the next room</span>
+      <span class="hint-touch">Tap to drive · Fly to take off · swipe up for the next room</span>
     </p>
 
-    <aside class="mapcard" id="mapcard" aria-label="Map of the maze">
+    <aside class="mapcard" id="mapcard" aria-label="Planner and map">
+      <section class="planner" aria-labelledby="planner-title">
+        <div class="mapcard-head">
+          <span class="mapcard-title" id="planner-title">Planner</span>
+          <span class="planner-note" id="plan-note">Hover the floor to compare</span>
+        </div>
+        <div class="plan-table">
+          <div class="plan-cols" aria-hidden="true"><span></span><span>time</span><span>energy</span><span>morphs</span></div>
+          <div class="plan-rows" role="radiogroup" aria-label="Which planner drives the robot">
+            <button type="button" class="plan-row" role="radio" aria-checked="true" data-kind="hybrid">
+              <span class="pr-name"><i class="pr-sw pr-hybrid" aria-hidden="true"></i>Hybrid</span>
+              <span class="pr-val" data-f="time">–</span><span class="pr-val" data-f="energy">–</span><span class="pr-val" data-f="morphs">–</span>
+            </button>
+            <button type="button" class="plan-row" role="radio" aria-checked="false" data-kind="roll">
+              <span class="pr-name"><i class="pr-sw pr-roll" aria-hidden="true"></i>Roll only</span>
+              <span class="pr-val" data-f="time">–</span><span class="pr-val" data-f="energy">–</span><span class="pr-val" data-f="morphs">–</span>
+            </button>
+            <button type="button" class="plan-row" role="radio" aria-checked="false" data-kind="fly">
+              <span class="pr-name"><i class="pr-sw pr-fly" aria-hidden="true"></i>Fly only</span>
+              <span class="pr-val" data-f="time">–</span><span class="pr-val" data-f="energy">–</span><span class="pr-val" data-f="morphs">–</span>
+            </button>
+          </div>
+        </div>
+        <label class="pref">
+          <span>Save energy</span>
+          <input type="range" id="pref" min="0" max="100" value="55" />
+          <span>Save time</span>
+        </label>
+        <p class="heur">
+          Search over (cell, mode). h = d<sub>octile</sub> × min(c<sub>roll</sub>, c<sub>fly</sub>) + c<sub>morph</sub> if airborne.
+        </p>
+      </section>
       <div class="mapcard-head">
         <span class="mapcard-title">Map</span>
-        <span class="mapcard-stat" id="stat">A* planner ready</span>
+        <span class="mapcard-stat" id="stat">Planner ready</span>
       </div>
       <div class="minimap" id="minimap">
         <canvas width="285" height="215"></canvas>
         <div class="mm-rooms" id="mm-rooms"></div>
       </div>
-      <p class="mapcard-help">Arrow keys or WASD drive by hand.</p>
+      <p class="mapcard-help">WASD or arrows drive by hand, rolling or flying.</p>
     </aside>
+
+    <div class="dock" id="dock" role="group" aria-label="Robot">
+      <span class="dock-mode" id="dock-mode" data-state="roll">
+        <i aria-hidden="true"></i><span class="dm-name">M4</span><span class="dm-label">Rolling</span>
+      </span>
+      <button class="dock-btn dock-fly" id="fly-btn" type="button" aria-pressed="false">
+        <span class="db-label">Fly</span><kbd aria-hidden="true">F</kbd>
+      </button>
+      <button class="dock-btn" id="cost-btn" type="button" aria-pressed="true">
+        <span class="db-label">Costmap</span><kbd aria-hidden="true">C</kbd>
+      </button>
+      <span class="cost-legend" aria-hidden="true">
+        <i class="cl-lethal"></i>lethal <i class="cl-insc"></i>inscribed <i class="cl-infl"></i>inflated
+      </span>
+    </div>
 
     <p class="sr-only" id="announce" aria-live="polite"></p>
 
@@ -94,10 +140,17 @@
           </p>
           <div class="howto">
             <p class="howto-title">This site is a maze, and the robot is yours.</p>
+            <p class="howto-m4">
+              It's a toy M4, the robot from Caltech that rolls and flies (I worked on its outdoor planning).
+            </p>
             <ul>
-              <li><b>Click or tap the floor.</b> It plans a path with A* (watch the search spread) and drives there.</li>
+              <li>
+                <b>Point at the floor</b> to preview a plan, <b>click</b> to go. The planner can roll, fly over walls, or
+                morph between the two, trading energy for time. A ghost rehearses the route first.
+              </li>
+              <li><b>F</b> folds the wheels into rotors and takes off; F again lands. <b>C</b> shows the local costmap.</li>
               <li><b>Scroll, or press Solve.</b> It visits every room in order: one room per chapter.</li>
-              <li><b>Arrow keys or WASD</b> drive it by hand. The map jumps to any room.</li>
+              <li><b>Arrow keys or WASD</b> drive it by hand, on the ground or in the air.</li>
             </ul>
             <div class="actions">
               <button class="btn btn-solve-inline" type="button" data-action="solve">Solve the maze</button>
@@ -255,7 +308,7 @@
           </ul>
           <p class="aside">
             The little robots around you are planning together: each one reserves its cells in space and time, so nobody
-            collides. A small nod to PyMAPF.
+            collides. A small nod to PyMAPF. The robot you're driving is a toy M4: press F and its wheels fold into rotors.
           </p>
         </div>
       </article>

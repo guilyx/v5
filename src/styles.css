@@ -15,6 +15,9 @@
   --accent-ink: #b8401c;
   --search: #3a6bf0;
   --search-ink: #2a55cc;
+  --fly: #e8850f;
+  --fly-ink: #a85a00;
+  --mapcard-w: 317px;
 
   --sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --serif: "Instrument Serif", ui-serif, Georgia, serif;
@@ -275,7 +278,7 @@ a:hover {
   z-index: 16;
   left: var(--gap);
   bottom: var(--gap);
-  width: 317px;
+  width: var(--mapcard-w);
   padding: 14px 16px 12px;
   border-radius: 18px;
   background: var(--paper);
@@ -294,6 +297,7 @@ a:hover {
   font-size: 15px;
 }
 .mapcard-stat {
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 600;
   color: var(--search-ink);
@@ -353,17 +357,302 @@ a:hover {
   color: var(--muted);
 }
 
+/* ------------------------------------------------------------------ planner */
+.planner {
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.planner-note {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.plan-cols,
+.plan-row {
+  display: grid;
+  grid-template-columns: 1fr 58px 50px 50px;
+  align-items: center;
+  column-gap: 4px;
+}
+.plan-cols {
+  padding: 0 8px 3px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: right;
+}
+.plan-row {
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  text-align: right;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.plan-row:hover {
+  background: var(--paper-2);
+}
+.plan-row[aria-checked="true"] {
+  border-color: var(--ink);
+  background: var(--paper-2);
+}
+.plan-row:focus-visible {
+  outline: 2px solid var(--search);
+  outline-offset: 1px;
+}
+.pr-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  text-align: left;
+  font-weight: 650;
+  color: var(--ink);
+}
+.pr-sw {
+  width: 18px;
+  height: 6px;
+  border-radius: 3px;
+  flex: none;
+}
+.pr-roll {
+  background: var(--search);
+}
+.pr-fly {
+  background: var(--fly);
+}
+.pr-hybrid {
+  background: linear-gradient(90deg, var(--search) 0 50%, var(--fly) 50% 100%);
+}
+.plan-row .is-best {
+  font-weight: 700;
+  color: var(--ink);
+}
+.plan-row.is-none .pr-val {
+  color: var(--muted);
+  font-weight: 500;
+}
+.plan-row.is-none [data-f="time"] {
+  grid-column: span 3;
+}
+.pref {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pref input {
+  width: 100%;
+  accent-color: var(--ink);
+}
+.heur {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.heur sub {
+  font-size: 9.5px;
+}
+
+/* ------------------------------------------------------------------ the robot dock */
+.dock {
+  position: fixed;
+  z-index: 16;
+  bottom: var(--gap);
+  /* centred in the open strip between the map card and the story panel */
+  left: calc((var(--gap) * 2 + var(--mapcard-w) + 100% - var(--panel-w) - var(--gap) * 2) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.5s var(--ease);
+}
+.maze-ready .dock {
+  opacity: 1;
+  pointer-events: auto;
+}
+.dock-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px 0 10px;
+  height: 40px;
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink);
+}
+.dock-mode i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--search);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--search) 20%, transparent);
+}
+.dock-mode[data-state="fly"] i,
+.dock-mode[data-state="takeoff"] i,
+.dock-mode[data-state="landing"] i {
+  background: var(--fly);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--fly) 22%, transparent);
+}
+.dock-mode[data-state="takeoff"] i,
+.dock-mode[data-state="landing"] i {
+  animation: pulse 0.5s var(--ease) infinite alternate;
+}
+.dm-name {
+  font-weight: 750;
+}
+.dm-label {
+  color: var(--muted);
+  font-weight: 600;
+  min-width: 74px;
+}
+.dock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 8px 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-weight: 650;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.dock-btn:hover {
+  background: color-mix(in srgb, var(--paper-2) 70%, var(--clay));
+}
+.dock-btn:focus-visible {
+  outline: 2px solid var(--search);
+  outline-offset: 2px;
+}
+.dock-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.dock-fly {
+  background: var(--fly);
+  color: #fff;
+}
+.dock-fly:hover {
+  background: var(--fly-ink);
+}
+.dock-fly[aria-pressed="true"] {
+  background: var(--ink);
+}
+#cost-btn[aria-pressed="true"] {
+  background: var(--ink);
+  color: #fffaf1;
+}
+.dock kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.24);
+  font: 700 13px/1 var(--sans);
+}
+.dock-btn:not(.dock-fly):not([aria-pressed="true"]) kbd {
+  background: rgba(43, 33, 24, 0.09);
+}
+.cost-legend {
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 0 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.cost-legend i {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  margin-left: 6px;
+}
+.cl-lethal {
+  background: #7a40e3;
+}
+.cl-insc {
+  background: #1ab3c7;
+}
+.cl-infl {
+  background: linear-gradient(90deg, #e8432f, #f2c24f);
+}
+@media (min-width: 1440px) {
+  .costmap-on .cost-legend {
+    display: inline-flex;
+  }
+}
+@media (hover: none) {
+  .dock kbd {
+    display: none;
+  }
+  .dock-btn {
+    padding: 0 16px;
+  }
+}
+
 /* short screens: a smaller map, so it covers less of the maze */
 @media (max-height: 780px) and (min-width: 861px) {
+  :root {
+    --mapcard-w: 268px;
+  }
   .mapcard {
-    width: 252px;
     padding: 12px 14px 10px;
   }
   .minimap {
-    width: 224px;
+    width: 240px;
   }
-  .mapcard-help {
+  .mapcard-help,
+  .heur {
     display: none;
+  }
+  .plan-cols,
+  .plan-row {
+    grid-template-columns: 1fr 46px 40px 46px;
+  }
+  .plan-row {
+    padding: 4px 6px;
+    font-size: 13.5px;
+  }
+  .pr-name {
+    gap: 6px;
+  }
+  .pr-sw {
+    width: 12px;
+  }
+}
+@media (max-height: 640px) and (min-width: 861px) {
+  .mapcard .minimap,
+  .mapcard > .mapcard-head {
+    display: none;
+  }
+  .planner {
+    border: 0;
+    margin: 0;
+    padding: 0;
   }
 }
 
@@ -761,6 +1050,8 @@ blockquote {
 /* ------------------------------------------------------------------ list mode: a plain, readable document */
 .is-list .stage,
 .is-list .mapcard,
+.is-list .dock,
+.no-webgl .dock,
 .is-list .hint,
 .is-list #solve,
 .is-list #map-toggle,
@@ -909,6 +1200,36 @@ blockquote {
     top: calc(var(--gap) + 58px);
     bottom: auto;
     transform: translateX(-50%);
+    max-height: calc(100dvh - var(--gap) * 2 - 64px);
+    overflow-y: auto;
+    /* above the story sheet while it's open; Map or Escape closes it */
+    z-index: 20;
+  }
+  /* the robot's controls sit under the top bar, out of the sheet's way */
+  .dock {
+    left: 50%;
+    bottom: auto;
+    top: calc(var(--gap) + 56px);
+    padding: 4px;
+  }
+  .dock-mode {
+    height: 36px;
+    padding: 0 6px 0 8px;
+    font-size: 14px;
+  }
+  .dm-label {
+    min-width: 0;
+  }
+  .dock-btn {
+    height: 36px;
+    font-size: 14px;
+  }
+  .map-open .dock {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .hint {
+    top: calc(var(--gap) + 106px) !important;
   }
   .is-list .rooms {
     width: calc(100% - 20px);
