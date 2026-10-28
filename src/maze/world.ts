@@ -5,14 +5,14 @@ import { nearestFree, pointClear, smooth } from "./astar";
 import { buildFloor } from "./floor";
 import { buildWalls } from "./walls";
 import { LIGHT, PAL, blobMaterial, clay } from "./gfx";
-import { TRACK, WHEEL_R, buildM4 } from "./m4";
+import { LENS, LIDAR, TRACK, WHEEL_R, buildM4 } from "./m4";
 import { ALT, Motion, type Pose, Rehearsal, type Step } from "./motion";
 import { FLY, type Mode, type ModalPlan, type PlanKind, ROLL, canFly, planModal, weights } from "./modal";
 import { buildCostmaps, rebuildCostmaps } from "./costmap";
 import { Lidar, type PathPiece, PathDots, Tracks } from "./fx";
 import { Atlas } from "./paint";
-import { type Det, type Fx, type Interactable, buildRooms } from "./props";
-import { Detector, RANGE, depthMaterial, drawDetections, drawFan, drawHud, viewFan } from "./sensors";
+import { type Det, type Fx, type Interactable, TROLLEY, buildRooms } from "./props";
+import { Detector, RANGE, depthMaterial, drawDetections, drawFan, drawHud, drawTag, viewFan } from "./sensors";
 import { type IxAction, type PddlView, Tasks } from "./tasks";
 
 export interface Insets {
@@ -205,9 +205,17 @@ export function startMaze(
 
   /* ---------------------------------------------------------------- things to do with objects */
   let gridDirty = false;
+  const lidarAt = () => ({
+    x: motion.x + Math.cos(motion.heading) * LIDAR.x * SCALE,
+    z: motion.z + Math.sin(motion.heading) * LIDAR.x * SCALE,
+    y: LIDAR.y * SCALE + motion.alt,
+  });
   const tasks = new Tasks(
     {
+      maze,
       motion,
+      lidarAt,
+      eye: () => eyeCam,
       scale: SCALE,
       grip: bot.arm.grip,
       driveThen(cell, before, after) {
@@ -237,7 +245,22 @@ export function startMaze(
     },
     rooms,
   );
+  scene.add(tasks.fx.group);
   const ixById = new Map(tasks.ix.map((i) => [i.id, i]));
+
+  // the trolley's legs, for the LiDAR: thin, and wrapped in tape that throws back a bright return
+  const trolley = rooms.find((f) => f.trolley)?.trolley;
+  const legXZ = new Float32Array(8);
+  const R2 = TROLLEY.legR * TROLLEY.legR;
+  if (trolley)
+    lidar.probe = (wx, wz) => {
+      const dx = wx - trolley.pose.x;
+      const dz = wz - trolley.pose.z;
+      // away from the trolley the grid decides; near it, only the legs are solid at scan height
+      if (dx * dx + dz * dz > 0.8) return -1;
+      for (let i = 0; i < 4; i++) if ((wx - legXZ[i * 2]) ** 2 + (wz - legXZ[i * 2 + 1]) ** 2 < R2) return 2;
+      return 0;
+    };
   const ixTargets = tasks.ix.flatMap((i) => i.targets.map((o) => ({ o, i })));
   let hovered: Interactable | null = null;
   let hoverPinned = false;
@@ -324,7 +347,7 @@ export function startMaze(
   let view: View = "top";
   const lens = new THREE.Object3D();
   // on the nose, just ahead of the visor; tilted down a little, more in the air
-  lens.position.set(0.31, 0.37, 0);
+  lens.position.set(LENS.x, LENS.y, 0);
   lens.rotation.order = "YXZ";
   lens.rotation.y = -Math.PI / 2;
   bot.lift.add(lens);
@@ -422,6 +445,8 @@ export function startMaze(
   const detector = new Detector();
   const dets: Det[] = [];
   const detecting = rooms.filter((f) => f.detect);
+  const hudRooms = rooms.filter((f) => f.hud);
+  const hudV = new THREE.Vector3();
   let fan: [number, number][] = [];
   let fanAt = -1;
   let overlayDirty = false;
@@ -450,7 +475,12 @@ export function startMaze(
 
   function drawOverlay(now: number) {
     const fanOn = view !== "fpv" && (sensors.detect || feedMode !== "off");
-    const need = sensors.detect || view === "fpv" || fanOn;
+    // rooms with a live readout (the swarm's network), while the camera is near them
+    const huds = hudRooms.filter((f) => {
+      const [rx, rz] = roomCenter[f.room];
+      return (rx - camera.position.x) ** 2 + (rz - camera.position.z) ** 2 < 26 * 26;
+    });
+    const need = sensors.detect || view === "fpv" || fanOn || tasks.fx.active || huds.length > 0;
     if (!need && !overlayDirty) return;
     const k = octx;
     k.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -460,6 +490,15 @@ export function startMaze(
     if (fanOn) drawFan(k, fan, camera, width, height);
     const live = sensors.detect ? detector.live(now) : [];
     if (sensors.detect) drawDetections(k, live, camera, width, height, FONT);
+    if (tasks.fx.active) tasks.fx.draw2D(k, camera, width, height, FONT);
+    for (const f of huds) {
+      const hd = f.hud!();
+      if (!hd) continue;
+      hudV.copy(hd.at).applyMatrix4(camera.matrixWorldInverse);
+      if (hudV.z > -0.1) continue;
+      hudV.copy(hd.at).project(camera);
+      drawTag(k, ((hudV.x + 1) / 2) * width, ((1 - hudV.y) / 2) * height, hd.title, hd.lines, hd.color, width, height, FONT);
+    }
     if (view === "fpv") {
       const ins = opts.insets();
       const sheet = ins.bottom > 0;
@@ -971,7 +1010,7 @@ export function startMaze(
     robotPos.alt = motion.alt;
     robotPos.heading = motion.heading;
     robotPos.flying = flyingNow;
-    tasks.update();
+    if (tasks.update(now)) busy = true;
     if (gridDirty) {
       gridDirty = false;
       rebuildCostmaps(maze, costmaps);
@@ -990,6 +1029,7 @@ export function startMaze(
     }
     bot.setMorph(motion.fold);
     bot.arm.set(motion.armQ, motion.grip);
+    bot.setLift(motion.lift);
     lens.rotation.x = -(0.1 + 0.22 * motion.fold);
     bot.setSpin(roll.neg, roll.pos, propAngle, rotor > 0.55 ? 1 : 0);
     const bob = motion.alt > 0.05 && !reduced ? Math.sin(now * 2.1) * 0.035 * (motion.alt / ALT) : 0;
@@ -1045,7 +1085,9 @@ export function startMaze(
     if (!flyingNow) tracks.update(now, motion.x, motion.z, motion.heading, motion.odo);
     else tracks.uniforms.uTime.value = now;
     const up = motion.fold > 0.5;
-    if (!reduced) lidar.update(now, dt, motion.x, motion.z, spin, up ? 0.7 : 0.3, up ? 0.78 : 0.5);
+    if (trolley) trolley.legs().forEach(([lx, lz], i) => legXZ.set([lx, lz], i * 2));
+    const lo = lidarAt();
+    if (!reduced) lidar.update(now, dt, lo.x, lo.z, spin, up ? 0.7 : 0.25, up ? 0.78 : lo.y);
     else lidar.uniforms.uTime.value = now;
     // the local costmap follows the robot, and switches layers as it morphs
     costVis += ((costOn ? 1 : 0) - costVis) * Math.min(1, dt * (reduced ? 60 : 6));

@@ -265,12 +265,20 @@ export class Lidar {
   points: THREE.Points;
   private pos: THREE.BufferAttribute;
   private birth: THREE.BufferAttribute;
+  private hot: THREE.BufferAttribute;
   private head = 0;
+  private lastHot = 0;
   angle = 0;
+  /**
+   * Things the grid doesn't hold (a trolley's legs): for a point in world space, -1 lets the grid
+   * decide, 0 is empty, 1 is a hit, 2 a hit on retro-reflective tape (a bright, high-intensity return).
+   */
+  probe: ((wx: number, wz: number) => number) | null = null;
   uniforms = {
     uTime: { value: 0 },
     uScale: { value: 300 },
     uColor: { value: new THREE.Color(PAL.accent) },
+    uHot: { value: new THREE.Color("#f3fdff") },
     uFogColor: LIGHT.uFogColor,
     uFogNear: LIGHT.uFogNear,
     uFogFar: LIGHT.uFogFar,
@@ -279,34 +287,42 @@ export class Lidar {
     const geo = new THREE.BufferGeometry();
     this.pos = new THREE.BufferAttribute(new Float32Array(max * 3), 3);
     this.birth = new THREE.BufferAttribute(new Float32Array(max).fill(-1e4), 1);
+    this.hot = new THREE.BufferAttribute(new Float32Array(max), 1);
     geo.setAttribute("position", this.pos);
     geo.setAttribute("aBirth", this.birth);
+    geo.setAttribute("aHot", this.hot);
     const mat = new THREE.ShaderMaterial({
       uniforms: this.uniforms,
       transparent: true,
       depthWrite: false,
       vertexShader: /* glsl */ `
         attribute float aBirth;
+        attribute float aHot;
         uniform float uTime, uScale;
         varying float vA;
         varying float vDepth;
+        varying float vHot;
         void main() {
           float age = uTime - aBirth;
-          vA = clamp(1.0 - age / 1.1, 0.0, 1.0);
+          vA = clamp(1.0 - age / (1.1 + aHot * 0.6), 0.0, 1.0);
+          vHot = aHot;
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           vDepth = -mv.z;
-          gl_PointSize = vA > 0.0 ? clamp(uScale * 0.09 / vDepth, 2.5, 12.0) : 0.0;
+          gl_PointSize = vA > 0.0 ? clamp(uScale * (0.09 + aHot * 0.05) / vDepth, 2.5, 14.0) : 0.0;
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `
         ${FOG_GLSL}
-        uniform vec3 uColor;
+        uniform vec3 uColor, uHot;
         varying float vA;
         varying float vDepth;
+        varying float vHot;
         void main() {
           vec2 d = gl_PointCoord - 0.5;
           if (vA <= 0.0 || dot(d, d) > 0.25) discard;
-          gl_FragColor = vec4(fogged(uColor, vDepth), vA * 0.9);
+          // tape on a trolley's legs throws back a bright return, with a blue halo
+          vec3 c = mix(uColor, mix(vec3(0.23, 0.42, 0.94), uHot, smoothstep(0.25, 0.1, dot(d, d))), vHot);
+          gl_FragColor = vec4(fogged(c, vDepth), vA * 0.9);
           #include <colorspace_fragment>
         }`,
     });
@@ -330,11 +346,13 @@ export class Lidar {
       this.head = (this.head + 1) % this.max;
       this.pos.setXYZ(i, hit[0], y, hit[1]);
       this.birth.setX(i, now);
+      this.hot.setX(i, this.lastHot);
       wrote = true;
     }
     if (wrote) {
       this.pos.needsUpdate = true;
       this.birth.needsUpdate = true;
+      this.hot.needsUpdate = true;
     }
   }
   private cast(x: number, z: number, a: number, above: number): [number, number] | null {
@@ -342,8 +360,18 @@ export class Lidar {
     const dz = Math.sin(a);
     const gx = x + W / 2;
     const gz = z + H / 2;
-    for (let r = 0.25; r < 9; r += 0.035) {
-      if (solidAt(this.maze, gx + dx * r, gz + dz * r) > above) return [x + dx * r, z + dz * r];
+    this.lastHot = 0;
+    for (let r = 0.12; r < 9; ) {
+      const px = x + dx * r;
+      const pz = z + dz * r;
+      const c = this.probe ? this.probe(px, pz) : -1;
+      if (c > 0) {
+        this.lastHot = c === 2 ? 1 : 0;
+        return [px, pz];
+      }
+      if (c < 0 && solidAt(this.maze, gx + dx * r, gz + dz * r) > above) return [px, pz];
+      // finer steps near thin things, so a leg can't slip between two samples
+      r += c < 0 ? 0.035 : 0.01;
     }
     return null;
   }

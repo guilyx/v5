@@ -37,7 +37,7 @@ export interface Track {
 }
 
 /** a line of sight from a to b that no wall slab crosses below the line */
-function lineClear(m: Maze, a: THREE.Vector3, b: THREE.Vector3) {
+export function lineClear(m: Maze, a: THREE.Vector3, b: THREE.Vector3) {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const dz = b.z - a.z;
@@ -241,6 +241,34 @@ export function drawFan(k: CanvasRenderingContext2D, pts: [number, number][], ca
   k.setLineDash([5, 4]);
   k.stroke();
   k.setLineDash([]);
+}
+
+/** a dark tag with a coloured edge, a title and a few lines, above a point on the screen */
+export function drawTag(k: CanvasRenderingContext2D, px: number, py: number, title: string, lines: string[], color: string, w: number, h: number, font: string) {
+  k.textBaseline = "middle";
+  k.font = `700 12.5px ${font}`;
+  let bw = k.measureText(title).width;
+  k.font = `550 12px ${font}`;
+  for (const line of lines) bw = Math.max(bw, k.measureText(line).width);
+  bw += 24;
+  const bh = 26 + lines.length * 17;
+  const x = Math.max(4, Math.min(w - bw - 4, px - bw / 2));
+  const y = Math.max(4, Math.min(h - bh - 4, py - bh - 10));
+  k.fillStyle = "rgba(43,33,24,0.84)";
+  k.beginPath();
+  k.roundRect(x, y, bw, bh, 10);
+  k.fill();
+  k.fillStyle = color;
+  k.beginPath();
+  k.roundRect(x, y, 5, bh, [10, 0, 0, 10]);
+  k.fill();
+  k.fillStyle = "#fffaf1";
+  k.font = `700 12.5px ${font}`;
+  k.fillText(title, x + 14, y + 15);
+  k.font = `550 12px ${font}`;
+  k.globalAlpha = 0.86;
+  lines.forEach((line, i) => k.fillText(line, x + 14, y + 33 + i * 17));
+  k.globalAlpha = 1;
 }
 
 export interface Telemetry {

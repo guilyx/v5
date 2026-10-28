@@ -18,6 +18,8 @@ export type Step =
   | { kind: "arm"; q: Joints; dur?: number }
   /** open (1) or close (0) the gripper */
   | { kind: "grip"; open: number; dur?: number }
+  /** raise (1) or lower (0) the lift deck */
+  | { kind: "lift"; to: number; dur?: number }
   /** run something at this point in the sequence (attach a block, tick a plan step) */
   | { kind: "call"; fn: () => void }
   | { kind: "wait"; t: number };
@@ -27,6 +29,7 @@ type Anim =
   | { kind: "turn"; from: number; to: number; t: number; dur: number }
   | { kind: "arm"; from: Joints; to: Joints; t: number; dur: number }
   | { kind: "grip"; from: number; to: number; t: number; dur: number }
+  | { kind: "lift"; from: number; to: number; t: number; dur: number }
   | { kind: "wait"; t: number; dur: number };
 
 const ease = (a: number, b: number, t: number) => {
@@ -78,6 +81,8 @@ export class Motion {
   /** arm joints and gripper opening (0 closed, 1 open) */
   armQ: Joints = [...STOW];
   grip = 0;
+  /** the lift deck: 0 down, 1 up */
+  lift = 0;
   /** flight leg being followed */
   private fly: { pts: [number, number][]; cum: number[]; s: number } | null = null;
   private anim: Anim | null = null;
@@ -181,6 +186,10 @@ export class Motion {
       this.anim = { kind: "grip", from: this.grip, to: s.open, t: 0, dur: s.dur ?? 0.25 };
       return;
     }
+    if (s.kind === "lift") {
+      this.anim = { kind: "lift", from: this.lift, to: s.to, t: 0, dur: s.dur ?? 0.9 };
+      return;
+    }
     if (s.kind === "wait") {
       this.anim = { kind: "wait", t: 0, dur: s.t };
       return;
@@ -239,6 +248,7 @@ export class Motion {
     } else if (a.kind === "arm") {
       for (let i = 0; i < 3; i++) this.armQ[i] = a.from[i] + (a.to[i] - a.from[i]) * k;
     } else if (a.kind === "grip") this.grip = a.from + (a.to - a.from) * k;
+    else if (a.kind === "lift") this.lift = a.from + (a.to - a.from) * k;
     this.drive.x = this.x;
     this.drive.z = this.z;
     this.drive.heading = this.heading;

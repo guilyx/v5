@@ -7,6 +7,7 @@ import { buildRobot } from "./robot";
 import { type Cell, planAll } from "./mapf";
 import { PHOTOS, PROJECTS } from "../media";
 import { BlocksTable } from "./blocks";
+import { RANGE, SHORT, SwarmNet } from "./swarm";
 
 /**
  * The rooms. Each chapter gets a few props built from primitives, merged so a room costs one
@@ -36,9 +37,30 @@ export interface Interactable {
   /** where the card points, in world space */
   anchor(): THREE.Vector3;
   highlight(on: boolean): void;
+  /** things it does on its own, at your request (the swarm's faults) */
+  actions?(): { id: string; label: string; primary?: boolean }[];
+  run?(action: string): void;
 }
 
-/** the trolley in the supermarket: it can be docked to and pushed around */
+/**
+ * The trolley in the supermarket, built for robots that dock underneath: four legs wrapped in
+ * retro-reflective tape (bright to a LiDAR), a frame high enough for M4 to drive under and lift,
+ * a fiducial tag on the handle side for cameras, and a handle an arm can hook.
+ */
+export const TROLLEY = {
+  /** leg centres, in the trolley's frame (x along its length, the handle at -x) */
+  legX: 0.55,
+  legZ: 0.44,
+  legR: 0.03,
+  /** underside of the frame, where a lift deck pushes */
+  frameY: 0.62,
+  handleX: -0.74,
+  handleY: 1.0,
+  halfL: 0.6,
+  halfD: 0.49,
+};
+export type TrolleyState = "idle" | "scanning" | "locked" | "lifted" | "hooked";
+
 export interface Trolley {
   group: THREE.Group;
   /** trolley centres: where it starts, and the checkout */
@@ -48,12 +70,16 @@ export interface Trolley {
   homeCell: [number, number];
   checkoutCell: [number, number];
   at: "home" | "checkout";
-  docked: boolean;
-  setPose(x: number, z: number): void;
-  /** world position of the handle bar, for a trolley centred at x */
-  handle(x: number): THREE.Vector3;
-  /** the detection box: searching, locked while docking, docked */
-  status(s: "idle" | "locked" | "docked"): void;
+  /** free on its wheels, lifted on a robot's deck, or hooked to a robot's arm */
+  mode: "free" | "lifted" | "hooked";
+  /** where it really is; the robot only ever has an estimate */
+  pose: { x: number; z: number; yaw: number };
+  setPose(x: number, z: number, yaw: number, lift?: number): void;
+  /** leg centres in world space, front left, front right, back left, back right */
+  legs(): [number, number][];
+  /** world position of the middle of the handle bar */
+  handle(): THREE.Vector3;
+  status(s: TrolleyState): void;
 }
 
 /** something the robot's camera can detect: a class, a label, and where it is right now */
@@ -69,6 +95,8 @@ export interface Fx {
   group: THREE.Group;
   /** report the detectable objects, with up-to-date boxes */
   detect?(out: Det[]): void;
+  /** a live readout drawn over the scene (the swarm's network health) */
+  hud?(): { at: THREE.Vector3; title: string; lines: string[]; color: string } | null;
   ix?: Interactable[];
   table?: BlocksTable;
   trolley?: Trolley;
@@ -865,17 +893,32 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
   });
   g.add(prod);
 
-  // the trolley: built around its own origin so it can be docked to and pushed
+  // the trolley: built around its own origin, so it can be docked to, lifted and moved
   const [tx, tz] = cellAt(r, 6, 5);
   const [ox, oz] = cellAt(r, 9, 5);
   const tg = new THREE.Group();
-  tg.position.set(tx, 0, tz);
   g.add(tg);
+  const T = TROLLEY;
   const t = new Kit();
   const steel = "#9fb0bd";
-  const L = 0.86;
-  const D = 0.56;
-  const yb = 0.42;
+  const dark = "#2f3336";
+  const L = T.halfL * 2;
+  const D = T.halfD * 2;
+  const yb = T.frameY + 0.05;
+  // casters and legs, at the corners of the frame
+  for (const sx of [-1, 1])
+    for (const sz of [-1, 1]) {
+      const lx = sx * T.legX;
+      const lz = sz * T.legZ;
+      t.cyl(0.045, 0.045, 0.032, lx, 0.045, lz, dark, 12, [Math.PI / 2, 0, 0]);
+      t.box(0.05, 0.05, 0.05, lx, 0.1, lz, "#5d6b63");
+      t.cyl(0.022, 0.022, T.frameY - 0.12, lx, (T.frameY + 0.12) / 2, lz, steel, 10);
+    }
+  // the frame M4's deck pushes on, and the plate in its middle
+  for (const sz of [-1, 1]) t.box(T.legX * 2 + 0.06, 0.04, 0.04, 0, T.frameY + 0.02, sz * T.legZ, steel);
+  for (const sx of [-1, 1]) t.box(0.04, 0.04, T.legZ * 2, sx * T.legX, T.frameY + 0.02, 0, steel);
+  t.box(0.46, 0.022, T.legZ * 2, 0, T.frameY + 0.011, 0, "#5d6b63");
+  // the basket
   t.box(L, 0.025, D, 0, yb, 0, steel);
   for (const h of [0.12, 0.25, 0.38]) {
     t.box(L, 0.022, 0.022, 0, yb + h, -D / 2, steel);
@@ -883,26 +926,45 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
     t.box(0.022, 0.022, D, -L / 2, yb + h, 0, steel);
     t.box(0.022, 0.022, D, L / 2, yb + h, 0, steel);
   }
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    t.box(0.025, 0.4, 0.025, (sx * L) / 2, yb + 0.2, (sz * D) / 2, steel);
-    t.box(0.03, yb, 0.03, (sx * (L - 0.1)) / 2, yb / 2, (sz * (D - 0.1)) / 2, steel);
-    t.cyl(0.05, 0.05, 0.035, (sx * (L - 0.1)) / 2, 0.05, (sz * (D - 0.1)) / 2, "#2f3336", 10, [Math.PI / 2, 0, 0]);
-  }
-  t.box(L - 0.1, 0.02, D - 0.08, 0, 0.13, 0, steel);
-  const HANDLE_X = -L / 2 - 0.12;
-  const HANDLE_Y = yb + 0.48;
-  t.box(0.03, 0.03, D + 0.08, HANDLE_X, HANDLE_Y, 0, "#2f7d4f");
-  for (const sz of [-1, 1]) t.box(0.16, 0.025, 0.025, -L / 2 - 0.06, yb + 0.44, (sz * D) / 2, steel);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) t.box(0.025, 0.4, 0.025, (sx * L) / 2, yb + 0.2, (sz * D) / 2, steel);
+  // the handle, on the -x side, with its brackets
+  t.box(0.03, 0.03, D + 0.06, T.handleX, T.handleY, 0, "#2f7d4f");
+  for (const sz of [-1, 1]) t.box(T.handleX + L / 2 + 0.04, 0.025, 0.025, (T.handleX - L / 2) / 2, T.handleY - 0.04, (sz * D) / 2 - 0.02, steel);
+  // a few groceries in the basket
+  const goods = ["#e4572e", "#f1b33b", "#3a9d8f", "#2d4f8c", "#e98aa5"];
+  goods.forEach((c, i) => t.box(0.2 + (i % 2) * 0.06, 0.16 + (i % 3) * 0.05, 0.2, -0.36 + i * 0.18, yb + 0.1 + (i % 3) * 0.025, ((i * 37) % 5) * 0.08 - 0.16, c));
   const body = t.mesh();
   tg.add(body);
+  // retro-reflective bands on the legs, at the height of M4's LiDAR
+  const bands = new Kit();
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) bands.cyl(T.legR - 0.002, T.legR - 0.002, 0.16, sx * T.legX, 0.28, sz * T.legZ, "#f4f8fb", 12);
+  tg.add(bands.mesh({ emissive: 0.75 }));
+  // a fiducial tag on the handle side, for camera pose estimation
+  const tagCv = document.createElement("canvas");
+  tagCv.width = tagCv.height = 128;
+  const tgk = tagCv.getContext("2d")!;
+  tgk.fillStyle = "#fff";
+  tgk.fillRect(0, 0, 128, 128);
+  tgk.fillStyle = "#111";
+  tgk.fillRect(8, 8, 112, 112);
+  const bits = [0b011010, 0b100111, 0b110001, 0b001101, 0b101100, 0b010011];
+  bits.forEach((row, y) => {
+    for (let x = 0; x < 6; x++) if ((row >> x) & 1) tgk.fillRect(24 + x * 13.3, 24 + y * 13.3, 13.3, 13.3);
+  });
+  const tagTex = new THREE.CanvasTexture(tagCv);
+  tagTex.colorSpace = THREE.SRGBColorSpace;
+  const fid = new THREE.Mesh(new THREE.PlaneGeometry(0.24, 0.24), clay({ map: tagTex, emissive: 0.3 }));
+  fid.position.set(-L / 2 - 0.014, yb + 0.22, 0);
+  fid.rotation.y = -Math.PI / 2;
+  tg.add(fid);
 
   // trolley detection: a box that locks on when the robot is in the room
   const det = new Kit();
   const bw = L + 0.42;
-  const bh = 1.05;
+  const bh = 1.28;
   const bd = D + 0.24;
   const e = 0.022;
-  const cx = -0.06;
+  const cx = -0.08;
   for (const y of [0, bh]) {
     det.box(bw, e, e, cx, y + 0.01, -bd / 2, "#ffffff");
     det.box(bw, e, e, cx, y + 0.01, bd / 2, "#ffffff");
@@ -922,8 +984,8 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
   tagC.width = 320;
   tagC.height = 64;
   const tk = tagC.getContext("2d")!;
-  const tagTex = new THREE.CanvasTexture(tagC);
-  tagTex.colorSpace = THREE.SRGBColorSpace;
+  const stateTex = new THREE.CanvasTexture(tagC);
+  stateTex.colorSpace = THREE.SRGBColorSpace;
   const drawTag = (text: string, color: string) => {
     tk.clearRect(0, 0, 320, 64);
     tk.fillStyle = color;
@@ -933,19 +995,26 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
     tk.font = `700 32px ${SANS}`;
     tk.textBaseline = "middle";
     spaced(tk, text, 22, 34, 3);
-    tagTex.needsUpdate = true;
+    stateTex.needsUpdate = true;
   };
   drawTag("TROLLEY 0.97", PAL.accent);
-  const tagMat = clay({ map: tagTex, emissive: 1, transparent: true, opacity: 0 });
+  const tagMat = clay({ map: stateTex, emissive: 1, transparent: true, opacity: 0 });
   const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.18), tagMat);
   tag.position.set(cx - bw / 2 + 0.45, bh + 0.15, bd / 2);
   tag.rotation.x = -0.6;
   tg.add(tag);
 
-  // the checkout, painted on the floor where the trolley can be pushed
+  // the checkout, painted on the floor where the trolley can be taken
   paintWord(ctx, "CHECKOUT", r.ink, ox, oz + 0.85, 26, 5);
 
-  let state: "idle" | "locked" | "docked" = "idle";
+  let state: TrolleyState = "idle";
+  const STATES: Record<TrolleyState, [string, string]> = {
+    idle: ["TROLLEY 0.97", PAL.accent],
+    scanning: ["SCANNING", PAL.search],
+    locked: ["LOCKED", PAL.search],
+    lifted: ["LIFTED", "#2f8f5b"],
+    hooked: ["HOOKED", "#2f8f5b"],
+  };
   const trolley: Trolley = {
     group: tg,
     home: [tx, tz],
@@ -953,31 +1022,49 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
     homeCell: [r.x + 6, r.y + 5],
     checkoutCell: [r.x + 9, r.y + 5],
     at: "home",
-    docked: false,
-    setPose(x, z) {
-      tg.position.set(x, 0, z);
+    mode: "free",
+    pose: { x: 0, z: 0, yaw: 0 },
+    setPose(x, z, yaw, lift = 0) {
+      this.pose.x = x;
+      this.pose.z = z;
+      this.pose.yaw = yaw;
+      tg.position.set(x, lift, z);
+      tg.rotation.y = -yaw;
     },
-    handle(x) {
-      return new THREE.Vector3(x + HANDLE_X, HANDLE_Y, tz);
+    legs() {
+      const { x, z, yaw } = this.pose;
+      const c = Math.cos(yaw);
+      const sn = Math.sin(yaw);
+      return [
+        [T.legX, -T.legZ],
+        [T.legX, T.legZ],
+        [-T.legX, -T.legZ],
+        [-T.legX, T.legZ],
+      ].map(([lx, lz]) => [x + lx * c - lz * sn, z + lx * sn + lz * c] as [number, number]);
+    },
+    handle() {
+      const { x, z, yaw } = this.pose;
+      return new THREE.Vector3(x + Math.cos(yaw) * T.handleX, T.handleY + tg.position.y, z + Math.sin(yaw) * T.handleX);
     },
     status(st) {
       state = st;
-      if (st === "idle") drawTag("TROLLEY 0.97", PAL.accent);
-      else if (st === "locked") drawTag("DOCKING", PAL.search);
-      else drawTag("DOCKED", "#2f8f5b");
-      detMat.uniforms.uColor.value.set(st === "idle" ? PAL.accent : st === "locked" ? PAL.search : "#2f8f5b");
+      const [text, color] = STATES[st];
+      drawTag(text, color);
+      detMat.uniforms.uColor.value.set(color);
       ctx.kick();
     },
   };
+  // left a little askew by whoever parked it: that's what the docking has to find out
+  trolley.setPose(tx + 0.05, tz - 0.04, 0.09);
   const ix: Interactable[] = [
     {
       id: "trolley",
       room: 5,
       name: "Trolley",
       kind: "active",
-      blurb: "The in-store robot's perception finds it. Dock with the arm on the handle, then push it to the checkout and back.",
+      blurb: "Its legs carry retro-reflective tape. M4 finds them in its LiDAR, fits them with ICP, drives underneath and lifts. Or it estimates the pose with its camera, and lifts it or hooks the handle.",
       targets: [body],
-      anchor: () => new THREE.Vector3(tg.position.x, 1.35, tg.position.z),
+      anchor: () => new THREE.Vector3(tg.position.x, 1.45, tg.position.z),
       highlight: glow([body]),
     },
   ];
@@ -1306,6 +1393,8 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
   const drones = new THREE.InstancedMesh(droneGeo, clay({ vertexColors: true }), N);
   const white = new THREE.Color("#f7f3ea");
   const red = new THREE.Color(PAL.accent);
+  const amber = new THREE.Color("#f0a43a");
+  const grey = new THREE.Color("#8d8780");
   for (let i = 0; i < N; i++) drones.setColorAt(i, white);
   g.add(drones);
   const shadows = new THREE.InstancedMesh(
@@ -1323,19 +1412,47 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
   const one = new THREE.Vector3(1, 1, 1);
   let fault = -1;
   let faultAt = 0;
+  let clock = 0;
   const col = new THREE.Color();
+
+  // the radio network: who hears whom, the groups, λ₂
+  const net = new SwarmNet(N);
+  const MAXL = (N * (N - 1)) / 2;
+  const linkPos = new Float32Array(MAXL * 6);
+  const linkCol = new Float32Array(MAXL * 6);
+  const linkGeo = new THREE.BufferGeometry();
+  linkGeo.setAttribute("position", new THREE.BufferAttribute(linkPos, 3));
+  linkGeo.setAttribute("color", new THREE.BufferAttribute(linkCol, 3));
+  linkGeo.setDrawRange(0, 0);
+  const links = new THREE.LineSegments(linkGeo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.7, depthWrite: false }));
+  links.frustumCulled = false;
+  links.renderOrder = 3;
+  g.add(links);
+  const cGood = new THREE.Color(PAL.search);
+  const cWeak = new THREE.Color("#c9d6f5");
+  const cJam = new THREE.Color(PAL.accent);
+  // the jammer's bubble
+  const bubble = new THREE.Mesh(
+    new THREE.SphereGeometry(1, 28, 16),
+    new THREE.MeshBasicMaterial({ color: PAL.accent, transparent: true, opacity: 0.1, depthWrite: false }),
+  );
+  bubble.visible = false;
+  g.add(bubble);
 
   // each drone flies itself: an acceleration toward its slot, damping, and separation from its
   // neighbours. The slot is on a slow circle over the room, or, when M4 is in the room, around M4.
+  // Slots go by rank among the drones still flying, so the formation closes up after a failure.
   const pos = new Float32Array(N * 3);
   const vel = new Float32Array(N * 3);
   const acc = new Float32Array(N * 3);
+  const rank = new Int16Array(N);
+  let flying = N;
   let lead = 0;
   const circle = (i: number, now: number, out: number[]) => {
-    const ph = (i / N) * Math.PI * 2;
+    const ph = (rank[i] / flying) * Math.PI * 2;
     const lane = i % 3;
     const th = now * (0.42 + lane * 0.05) + ph;
-    const rad = 2.1 + lane * 0.55 + 0.35 * Math.sin(now * 0.6 + i * 1.3);
+    const rad = (2.1 + lane * 0.55 + 0.35 * Math.sin(now * 0.6 + i * 1.3)) * net.spread;
     out[0] = cx + Math.cos(th) * rad;
     out[1] = 1.55 + lane * 0.28 + 0.16 * Math.sin(now * 1.1 + i * 2.1);
     out[2] = cz + Math.sin(th) * rad * 0.82;
@@ -1343,9 +1460,9 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
   const around = (i: number, now: number, out: number[]) => {
     // an escort: a loose ring around a point just ahead of the robot, near its camera's height,
     // so you see them from the robot's own view too
-    const ph = (i / N) * Math.PI * 2 + now * 0.55;
+    const ph = (rank[i] / flying) * Math.PI * 2 + now * 0.55;
     const lane = i % 3;
-    const rad = 0.95 + lane * 0.45;
+    const rad = (0.95 + lane * 0.45) * net.spread;
     // a ring squashed along the heading, so the nearest drone stays a body length ahead
     const ahead = 2.2;
     const h = ctx.robot.heading;
@@ -1358,22 +1475,57 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
   const a = [0, 0, 0];
   const b = [0, 0, 0];
   for (let i = 0; i < N; i++) {
+    rank[i] = i;
     circle(i, 0, a);
     pos.set(a, i * 3);
   }
   const step = (now: number, dt: number) => {
+    flying = 0;
+    for (let i = 0; i < N; i++) if (net.alive[i]) rank[i] = flying++;
     for (let i = 0; i < N; i++) {
+      const o = i * 3;
+      if (!net.alive[i]) {
+        // failed: it falls, and lies where it lands
+        acc[o] = -4 * vel[o];
+        acc[o + 2] = -4 * vel[o + 2];
+        acc[o + 1] = pos[o + 1] > 0.06 ? -9 : 0;
+        if (pos[o + 1] <= 0.06) {
+          pos[o + 1] = 0.06;
+          vel[o + 1] = 0;
+        }
+        continue;
+      }
       circle(i, now, a);
       if (lead > 0.001) {
         around(i, now, b);
         for (let k = 0; k < 3; k++) a[k] += (b[k] - a[k]) * lead;
       }
-      const o = i * 3;
+      if (net.lost[i]) {
+        // cut off: head back toward the nearest drone still in the main group
+        let bd = Infinity;
+        let bj = -1;
+        for (let j = 0; j < N; j++) {
+          if (j === i || !net.alive[j] || net.lost[j] || net.radioDown[j]) continue;
+          const d = (pos[j * 3] - pos[o]) ** 2 + (pos[j * 3 + 2] - pos[o + 2]) ** 2;
+          if (d < bd) {
+            bd = d;
+            bj = j;
+          }
+        }
+        if (bj >= 0) {
+          const d = Math.sqrt(bd) || 1;
+          a[0] = pos[bj * 3] + ((pos[o] - pos[bj * 3]) / d) * 0.5;
+          a[1] = pos[bj * 3 + 1];
+          a[2] = pos[bj * 3 + 2] + ((pos[o + 2] - pos[bj * 3 + 2]) / d) * 0.5;
+        }
+      }
       for (let k = 0; k < 3; k++) acc[o + k] = 16 * (a[k] - pos[o + k]) - 6.5 * vel[o + k];
     }
     // keep a little distance from each other (and from the robot)
-    for (let i = 0; i < N; i++)
+    for (let i = 0; i < N; i++) {
+      if (!net.alive[i]) continue;
       for (let j = i + 1; j < N; j++) {
+        if (!net.alive[j]) continue;
         const dx = pos[i * 3] - pos[j * 3];
         const dy = pos[i * 3 + 1] - pos[j * 3 + 1];
         const dz = pos[i * 3 + 2] - pos[j * 3 + 2];
@@ -1387,6 +1539,7 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
         acc[j * 3 + 1] -= dy * f;
         acc[j * 3 + 2] -= dz * f;
       }
+    }
     const ry = ctx.robot.flying ? ctx.robot.alt + 0.25 : 0.55;
     for (let i = 0; i < N; i++) {
       const o = i * 3;
@@ -1394,7 +1547,7 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
       const dz = pos[o + 2] - ctx.robot.z;
       const dy = pos[o + 1] - ry;
       const d2 = dx * dx + dy * dy + dz * dz;
-      if (d2 < 0.8 && lead > 0.01) {
+      if (net.alive[i] && d2 < 0.8 && lead > 0.01) {
         const f = (0.8 - d2) * 30;
         acc[o] += dx * f;
         acc[o + 1] += Math.abs(dy) * f * 0.5;
@@ -1411,48 +1564,101 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
     for (let i = 0; i < N; i++) {
       const o = i * 3;
       let y = pos[o + 1];
-      if (i === fault) {
+      let c = net.alive[i] ? (net.lost[i] ? amber : white) : grey;
+      if (i === fault && net.alive[i]) {
         const t = now - faultAt;
         const dip = t < 0.7 ? t / 0.7 : Math.max(0, 1 - (t - 0.7) / 1.4);
         y -= dip * 0.75;
-        drones.setColorAt(i, col.copy(white).lerp(red, Math.min(1, dip * 1.6)));
+        c = col.copy(white).lerp(red, Math.min(1, dip * 1.6));
       }
+      drones.setColorAt(i, c);
       p.set(pos[o], y, pos[o + 2]);
-      // face where it flies, bank into its acceleration
+      // face where it flies, bank into its acceleration; a fallen one lies tilted
       const yaw = Math.atan2(vel[o + 2], vel[o]);
-      e.set(THREE.MathUtils.clamp(acc[o + 2] * 0.01, -0.4, 0.4), -yaw, THREE.MathUtils.clamp(-acc[o] * 0.01, -0.4, 0.4));
+      if (net.alive[i]) e.set(THREE.MathUtils.clamp(acc[o + 2] * 0.01, -0.4, 0.4), -yaw, THREE.MathUtils.clamp(-acc[o] * 0.01, -0.4, 0.4));
+      else e.set(0.35, i, 0.2);
       q.setFromEuler(e);
       mt.compose(p, q, one);
       drones.setMatrixAt(i, mt);
-      mt.makeTranslation(p.x + 0.35, 0.005, p.z + 0.3);
+      mt.makeTranslation(p.x + 0.35 * Math.min(1, y), 0.005, p.z + 0.3 * Math.min(1, y));
       shadows.setMatrixAt(i, mt);
     }
     drones.instanceMatrix.needsUpdate = true;
     drones.computeBoundingSphere();
     shadows.instanceMatrix.needsUpdate = true;
     if (drones.instanceColor) drones.instanceColor.needsUpdate = true;
+    // the radio links: blue when strong, pale at the edge of range, red where the jammer cuts them
+    for (let k = 0; k < net.pairs; k++) {
+      const i = net.pairA[k];
+      const j = net.pairB[k];
+      linkPos.set([pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2], pos[j * 3], pos[j * 3 + 1], pos[j * 3 + 2]], k * 6);
+      const qk = net.pairQ[k];
+      if (qk < 0) col.copy(cJam);
+      else col.copy(cWeak).lerp(cGood, Math.min(1, qk * 1.6));
+      linkCol.set([col.r, col.g, col.b, col.r, col.g, col.b], k * 6);
+    }
+    linkGeo.setDrawRange(0, net.pairs * 2);
+    linkGeo.attributes.position.needsUpdate = true;
+    linkGeo.attributes.color.needsUpdate = true;
+    const jam = net.jam;
+    bubble.visible = !!jam;
+    if (jam) {
+      bubble.position.set(jam.x, jam.y, jam.z);
+      bubble.scale.setScalar(jam.r * (1 + 0.04 * Math.sin(now * 9)));
+    }
   };
   place(0);
+
+  const centroid = () => {
+    let x = 0;
+    let y = 0;
+    let z = 0;
+    let n = 0;
+    for (let i = 0; i < N; i++) {
+      if (!net.alive[i]) continue;
+      x += pos[i * 3];
+      y += pos[i * 3 + 1];
+      z += pos[i * 3 + 2];
+      n++;
+    }
+    n = Math.max(1, n);
+    return new THREE.Vector3(x / n, y / n, z / n);
+  };
   const ix: Interactable[] = [
     {
       id: "flock",
       room: 8,
       name: "Swarm",
       kind: "passive",
-      blurb: "Thirty drones, each steering by acceleration toward its place in the flock. Come into the room, rolling or flying, and they flock with you.",
+      blurb: "Thirty drones on a mesh radio: each only hears its neighbours. Come in and they flock with you. Jam them, fail one, or cut the range, and watch the network heal.",
       targets: [drones],
-      anchor: () => {
-        let x = 0;
-        let y = 0;
-        let z = 0;
-        for (let i = 0; i < N; i++) {
-          x += pos[i * 3];
-          y += pos[i * 3 + 1];
-          z += pos[i * 3 + 2];
-        }
-        return new THREE.Vector3(x / N, y / N + 0.5, z / N);
-      },
+      anchor: () => centroid().add(new THREE.Vector3(0, 0.5, 0)),
       highlight: glow([drones]),
+      actions: () => [
+        { id: "jam", label: "Jam the radio", primary: true },
+        { id: "fail", label: "Fail a drone" },
+        { id: "range", label: net.target === SHORT ? "Full radio range" : "Short radio range" },
+        ...(net.count < N ? [{ id: "revive", label: "Bring them back" }] : []),
+      ],
+      run: (action) => {
+        if (action === "jam") {
+          // a jammer off to one side of the flock, for eight seconds: it cuts off part of it
+          const c = centroid();
+          let fx = c.x;
+          let fz = c.z;
+          for (let i = 0; i < N; i++) {
+            if (!net.alive[i]) continue;
+            const d = Math.hypot(pos[i * 3] - c.x, pos[i * 3 + 2] - c.z);
+            if (d > Math.hypot(fx - c.x, fz - c.z)) [fx, fz] = [pos[i * 3], pos[i * 3 + 2]];
+          }
+          net.jam = { x: c.x + (fx - c.x) * 0.75, y: c.y, z: c.z + (fz - c.z) * 0.75, r: 1.0, until: clock + 8 };
+        } else if (action === "fail") {
+          const h = net.hub();
+          if (h >= 0) net.alive[h] = 0;
+        } else if (action === "range") net.target = net.target === SHORT ? RANGE : SHORT;
+        else if (action === "revive") net.alive.fill(1);
+        ctx.kick();
+      },
     },
   ];
   const droneDets = Array.from({ length: N }, (_, i) => detOf(`drone-${i}`, "drone"));
@@ -1464,15 +1670,34 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
       instanceBoxes(drones, droneDets, 0.04);
       out.push(...droneDets);
     },
+    hud() {
+      const lost = net.lost.reduce((s, v) => s + v, 0);
+      const lines = [
+        `${net.count} of ${N} flying · ${net.links} links${net.jammedLinks ? ` · ${net.jammedLinks} jammed` : ""}`,
+        `${net.groups} ${net.groups === 1 ? "group" : "groups"} · λ₂ ${net.lambda2.toFixed(2)}${net.groups > 1 ? " (split)" : ""}`,
+      ];
+      if (lost) lines.push(`${lost} cut off, flying back to the group`);
+      if (net.jam) lines.push(`jammed for ${Math.max(0, net.jam.until - clock).toFixed(0)} s`);
+      if (net.target === SHORT) lines.push(`short range ${net.range.toFixed(2)}: formation at ${Math.round(net.spread * 100)}%`);
+      const ok = net.groups === 1 && !lost;
+      return { at: centroid().add(new THREE.Vector3(0, 1.1, 0)), title: "Swarm network", lines, color: ok ? "#2f8f5b" : "#e8850f" };
+    },
     update(now, dt, inside) {
-      if (ctx.reduced) return false;
+      clock = now;
+      if (ctx.reduced) {
+        net.update(pos, now, dt);
+        place(now);
+        return false;
+      }
       lead += ((inside ? 1 : 0) - lead) * Math.min(1, dt * 1.6);
-      // every few seconds one drone fails, drops, and the layer recovers it
+      // every few seconds one drone's radio drops out: it dips, the layer recovers it
       if (now - faultAt > 4.5) {
-        if (fault >= 0) drones.setColorAt(fault, white);
+        if (fault >= 0) net.radioDown[fault] = 0;
         fault = Math.floor((now * 7.3) % N);
         faultAt = now;
       }
+      net.radioDown[fault] = net.alive[fault] && now - faultAt < 1.6 ? 1 : 0;
+      net.update(pos, now, dt);
       // small fixed steps keep the flock stable on a slow frame
       let left = Math.min(dt, 0.1);
       while (left > 1e-4) {

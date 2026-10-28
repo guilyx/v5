@@ -1,10 +1,12 @@
 import * as THREE from "three";
-import { BLOCK as SOLID, FLOOR, worldToCell } from "./layout";
-import { type Joints, STOW, solveIK } from "./arm";
+import { BLOCK as SOLID, FLOOR, type Maze, worldToCell } from "./layout";
+import { ARM_BASE, type Joints, STOW, solveIK } from "./arm";
+import { DECK_RISE, DECK_TOP } from "./m4";
+import { DockFx, type Pose2, angleDiff, cameraEstimate, denseScan, icp } from "./dock";
 import { type Spot, BLOCK, BlocksTable, TOP } from "./blocks";
 import { type Step as PlanStep, BLOCKS_DOMAIN, blocksProblem, parseDomain, parseProblem, solve } from "./pddl";
 import type { Motion, Step } from "./motion";
-import type { Fx, Interactable, Trolley } from "./props";
+import { type Fx, type Interactable, TROLLEY, type Trolley } from "./props";
 
 /**
  * Active interactions: what the robot does when you ask it to do something with an object.
@@ -33,7 +35,12 @@ export interface PddlView {
 }
 
 export interface TaskHost {
+  maze: Maze;
   motion: Motion;
+  /** where the LiDAR is, in world space */
+  lidarAt(): { x: number; z: number; y: number };
+  /** the robot's camera, posed where its lens is */
+  eye(): THREE.PerspectiveCamera;
   /** the robot's scale: the arm's IK works in the robot's unscaled frame */
   scale: number;
   grip: THREE.Object3D;
@@ -58,6 +65,12 @@ export class Tasks {
   ix: Interactable[] = [];
   private pddlView: PddlView | null = null;
   private running: "blocks" | "trolley" | null = null;
+  /** the trolley's pose in the robot's frame, while it's lifted or hooked */
+  private rel: Pose2 | null = null;
+  /** the grip point on the handle, robot-local and unscaled, while hooked */
+  private hookLocal: [number, number, number] = [0.3, 0.7, -0.16];
+  /** what the docking perception shows */
+  fx = new DockFx();
 
   constructor(private host: TaskHost, rooms: Fx[]) {
     for (const f of rooms) {
@@ -78,18 +91,29 @@ export class Tasks {
       ];
     }
     if (id === "trolley" && this.trolley) {
-      if (this.running === "trolley") return [];
-      if (!this.trolley.docked) return [{ id: "dock", label: "Detect & dock", primary: true }];
+      const t = this.trolley;
+      if (this.running === "trolley") return [{ id: "stop", label: "Stop" }];
+      const there = t.at === "home" ? "to checkout" : "back";
+      if (t.mode === "lifted")
+        return [
+          { id: "carry", label: `Carry it ${there}`, primary: true },
+          { id: "down", label: "Put it down" },
+        ];
+      if (t.mode === "hooked")
+        return [
+          { id: "drag", label: t.at === "home" ? "Push it to checkout" : "Pull it back", primary: true },
+          { id: "unhook", label: "Let go" },
+        ];
       return [
-        this.trolley.at === "home"
-          ? { id: "push", label: "Push to checkout", primary: true }
-          : { id: "back", label: "Push back to the aisle", primary: true },
-        { id: "undock", label: "Undock" },
+        { id: "lidar", label: "Dock under · LiDAR + ICP", primary: true },
+        { id: "camera", label: "Dock under · camera" },
+        { id: "hook", label: "Hook the handle · camera" },
       ];
     }
     const ix = this.ix.find((i) => i.id === id);
-    if (ix?.kind === "passive" && id !== "pendulum") return [{ id: "go", label: "Go there" }];
-    return [];
+    const own = ix?.actions?.() ?? [];
+    if (ix?.kind === "passive" && id !== "pendulum") return [...own, { id: "go", label: "Go there" }];
+    return own;
   }
 
   run(id: string, action: string) {
@@ -101,19 +125,33 @@ export class Tasks {
       const ix = this.ix.find((i) => i.id === id);
       if (ix) this.host.goRoom(ix.room);
     } else if (id === "trolley") {
-      if (action === "dock") this.dock();
-      else if (action === "push") this.push(true);
-      else if (action === "back") this.push(false);
-      else if (action === "undock") this.host.run([...this.undockSteps(), this.done()]);
+      if (action === "lidar") this.dockLidar();
+      else if (action === "camera") this.viaCamera("under");
+      else if (action === "hook") this.viaCamera("hook");
+      else if (action === "carry" || action === "drag") this.move();
+      else if (action === "down" || action === "unhook" || action === "stop") this.host.run([...this.release(), this.done()]);
+    } else {
+      // things that act on their own (the swarm's faults)
+      this.ix.find((i) => i.id === id)?.run?.(action);
+      this.host.changed();
     }
   }
 
-  /** every frame: a docked trolley goes where the robot pushes it */
-  update() {
+  /** every frame: a lifted or hooked trolley goes where the robot takes it */
+  update(now: number) {
     const t = this.trolley;
-    if (!t?.docked) return;
-    const m = this.host.motion;
-    t.setPose(m.x + Math.cos(m.heading) * DOCK_GAP, m.z + Math.sin(m.heading) * DOCK_GAP);
+    if (t && t.mode !== "free" && this.rel) {
+      const m = this.host.motion;
+      const S = this.host.scale;
+      const c = Math.cos(m.heading);
+      const sn = Math.sin(m.heading);
+      const r = this.rel;
+      // on the deck: it rises once the deck reaches the frame
+      const lift = t.mode === "lifted" ? Math.max(0, (DECK_TOP + 0.005 + DECK_RISE * m.lift) * S - TROLLEY.frameY) : 0;
+      t.setPose(m.x + r.x * c - r.z * sn, m.z + r.x * sn + r.z * c, m.heading + r.yaw, lift);
+    }
+    if (t) this.fx.at.set(t.pose.x, 1.75, t.pose.z);
+    return this.fx.update(now);
   }
 
   get busy() {
@@ -126,10 +164,18 @@ export class Tasks {
    */
   release(): Step[] {
     const steps: Step[] = [];
+    const m = this.host.motion;
     if (this.table?.holding) this.table.recover();
-    if (this.trolley?.docked) steps.push(...this.undockSteps());
-    else if (!this.host.motion.stowed || this.host.motion.grip > 0.01)
-      steps.push({ kind: "grip", open: 0, dur: 0.15 }, { kind: "arm", q: STOW, dur: 0.45 });
+    if (this.trolley?.mode === "lifted") steps.push(...this.putDownSteps());
+    else if (this.trolley?.mode === "hooked") steps.push(...this.unhookSteps());
+    else {
+      if (!m.stowed || m.grip > 0.01) steps.push({ kind: "grip", open: 0, dur: 0.15 }, { kind: "arm", q: STOW, dur: 0.45 });
+      if (m.lift > 0.01) steps.push({ kind: "lift", to: 0, dur: 0.6 });
+      if (this.running === "trolley") {
+        this.trolley?.status("idle");
+        this.fx.clear();
+      }
+    }
     if (this.running) {
       const v = this.running === "blocks" ? this.pddlView : null;
       this.running = null;
@@ -226,9 +272,10 @@ export class Tasks {
     this.host.pddl(view);
 
     // where the robot works: in front of the table, facing it
-    const wx = t.x;
-    const wz = t.z - (0.25 + 0.05 + 0.4);
+    // stand so the arm, on the robot's left side, is centred on the table
     const wh = HALF_PI;
+    const wx = t.x + ARM_BASE.z * this.host.scale * Math.sin(wh);
+    const wz = t.z - (0.25 + 0.05 + 0.4);
     const steps: Step[] = [...this.approach(wx, wz, wh, 1.2)];
     steps.push({ kind: "grip", open: 1, dur: 0.2 });
 
@@ -322,103 +369,265 @@ export class Tasks {
 
   /* ---------------------------------------------------------------- trolley */
 
-  private dockPose() {
+  /** where the map says the trolley is: the middle of its spot, square to the aisle */
+  private prior(): Pose2 {
     const t = this.trolley!;
     const c = t.at === "home" ? t.home : t.checkout;
-    const h = t.handle(c[0]);
-    return { x: h.x - ARM_TO_HANDLE, z: c[1], handle: h };
+    return { x: c[0], z: c[1], yaw: 0 };
+  }
+  private behind(p: Pose2, d: number): [number, number] {
+    return [p.x - Math.cos(p.yaw) * d, p.z - Math.sin(p.yaw) * d];
+  }
+  private start(): boolean {
+    const t = this.trolley;
+    if (!t || t.mode !== "free" || this.running) return false;
+    this.fx.clear();
+    return true;
+  }
+  private fail(why: string) {
+    this.fx.say("Docking", [why], "#e4572e");
+    this.trolley?.status("idle");
+    this.running = null;
+    this.host.changed();
   }
 
-  private dock() {
-    const t = this.trolley;
-    if (!t || t.docked || this.running) return;
+  /** LiDAR: look at it from behind its spot, find the bright legs, fit them with ICP, go under */
+  private dockLidar() {
+    if (!this.start()) return;
+    const t = this.trolley!;
     const pre = this.release();
-    const d = this.dockPose();
-    const preX = d.x - 0.65;
-    const above = d.handle.clone();
-    above.y += 0.14;
+    const prior = this.prior();
+    const [sx, sz] = this.behind(prior, 1.5);
     const steps: Step[] = [
-      ...this.approach(preX, d.z, 0, 1.2),
-      { kind: "call", fn: () => t.status("locked") },
-      { kind: "wait", t: 0.25 },
-      { kind: "line", to: [d.x, d.z], speed: 0.7 },
-      { kind: "grip", open: 1, dur: 0.2 },
-      { kind: "arm", q: this.ik(above, d.x, d.z, 0), dur: 0.55 },
-      { kind: "arm", q: this.ik(d.handle, d.x, d.z, 0), dur: 0.3 },
-      { kind: "grip", open: 0.25, dur: 0.2 },
+      ...this.approach(sx, sz, prior.yaw, 1.2),
       {
         kind: "call",
         fn: () => {
-          t.docked = true;
-          t.status("docked");
-          // the robot now carries the trolley's cell with it
-          const [hx, hy] = t.at === "home" ? t.homeCell : t.checkoutCell;
-          this.host.setCell(hx, hy, FLOOR);
+          t.status("scanning");
+          this.fx.say("LiDAR + ICP", ["One sweep: looking for bright returns"], "#e8850f");
+        },
+      },
+      { kind: "wait", t: 0.5 },
+      { kind: "call", fn: () => this.icpThenDock() },
+    ];
+    this.running = "trolley";
+    this.host.changed();
+    if (!this.host.driveThen(worldToCell(sx, sz), pre, steps)) this.fail("Can't get behind it from here.");
+  }
+
+  private icpThenDock() {
+    const t = this.trolley!;
+    const o = this.host.lidarAt();
+    const pts = denseScan(this.host.maze, o.x, o.z, this.host.motion.heading, t.legs(), [t.pose.x, t.pose.z], this.host.rand);
+    this.fx.showScan(pts, o.y);
+    const res = icp(
+      pts.filter((p) => p.hot),
+      this.prior(),
+      o,
+    );
+    if (!res) return this.fail("Not enough reflective legs in view.");
+    this.fx.showIcp(res);
+    this.host.run(this.underSteps(res.pose, "LiDAR + ICP", this.fx.icpDuration + 0.4));
+  }
+
+  /** camera: look from further back, then again from the pre-dock pose, then go under or hook it */
+  private viaCamera(goal: "under" | "hook") {
+    if (!this.start()) return;
+    const t = this.trolley!;
+    const pre = this.release();
+    const prior = this.prior();
+    const [vx, vz] = this.behind(prior, 2.6);
+    const steps: Step[] = [
+      ...this.approach(vx, vz, prior.yaw, 1.2),
+      {
+        kind: "call",
+        fn: () => {
+          t.status("scanning");
+          this.fx.say("Camera", ["Looking for the legs' feet in the image"]);
+        },
+      },
+      { kind: "wait", t: 0.5 },
+      { kind: "call", fn: () => this.cameraLook(goal, 1) },
+    ];
+    this.running = "trolley";
+    this.host.changed();
+    if (!this.host.driveThen(worldToCell(vx, vz), pre, steps)) this.fail("Can't get a view of it from here.");
+  }
+
+  private cameraLook(goal: "under" | "hook", stage: number) {
+    const t = this.trolley!;
+    const est = cameraEstimate(this.host.eye(), this.host.maze, t.legs(), this.host.rand);
+    if (!est) return this.fail("Fewer than three legs in view.");
+    this.fx.showCamera(est, stage);
+    if (stage === 1) {
+      // nearer, each pixel covers less floor: drive in along this estimate's axis and look again,
+      // from just far enough that the near legs' feet are still in the bottom of the image
+      const [nx, nz] = this.behind(est.pose, 2.0);
+      this.host.run([
+        { kind: "wait", t: 1.4 },
+        ...this.approach(nx, nz, est.pose.yaw, 0.9),
+        { kind: "wait", t: 0.3 },
+        { kind: "call", fn: () => this.cameraLook(goal, 2) },
+      ]);
+    } else this.host.run(goal === "under" ? this.underSteps(est.pose, "Camera", 1.6) : this.hookSteps(est.pose, 1.6));
+  }
+
+  /** from an estimate: line up behind it, drive in under the frame, measure, lift */
+  private underSteps(est: Pose2, method: string, delay: number): Step[] {
+    const t = this.trolley!;
+    const [px, pz] = this.behind(est, 1.45);
+    return [
+      { kind: "wait", t: delay },
+      { kind: "call", fn: () => t.status("locked") },
+      ...this.approach(px, pz, est.yaw, 0.8),
+      { kind: "line", to: [est.x, est.z], speed: 0.5 },
+      {
+        kind: "call",
+        fn: () => {
+          const m = this.host.motion;
+          // how well it did, against where the trolley really is (the robot never knows this)
+          this.fx.result(method, Math.hypot(m.x - t.pose.x, m.z - t.pose.z), angleDiff(m.heading, t.pose.yaw));
+          this.attach("lifted");
+        },
+      },
+      { kind: "lift", to: 1, dur: 1.0 },
+      this.done(),
+    ];
+  }
+
+  /** from an estimate: stand behind the handle, reach it with the arm, close the gripper */
+  private hookSteps(est: Pose2, delay: number): Step[] {
+    const t = this.trolley!;
+    const S = this.host.scale;
+    const [hx, hz] = this.behind(est, HOOK_GAP);
+    // the bar runs across the trolley; grip it in line with the arm, which is off to the robot's left
+    const side = ARM_BASE.z * S;
+    const grip = new THREE.Vector3(
+      est.x + Math.cos(est.yaw) * TROLLEY.handleX - Math.sin(est.yaw) * side,
+      TROLLEY.handleY,
+      est.z + Math.sin(est.yaw) * TROLLEY.handleX + Math.cos(est.yaw) * side,
+    );
+    const above = grip.clone().setY(grip.y + 0.16);
+    // where the gripper holds the bar, in the robot's frame: letting go starts from there
+    this.hookLocal = this.local(grip, hx, hz, est.yaw);
+    return [
+      { kind: "wait", t: delay },
+      { kind: "call", fn: () => t.status("locked") },
+      ...this.approach(hx, hz, est.yaw, 0.7),
+      { kind: "grip", open: 1, dur: 0.2 },
+      { kind: "arm", q: this.ik(above, hx, hz, est.yaw), dur: 0.6 },
+      { kind: "arm", q: this.ik(grip, hx, hz, est.yaw), dur: 0.35 },
+      { kind: "grip", open: 0.3, dur: 0.2 },
+      {
+        kind: "call",
+        fn: () => {
+          // the gripper can sit anywhere along the bar: what counts is how far off it is across it
+          const h = t.handle();
+          const across = Math.abs((grip.x - h.x) * Math.cos(t.pose.yaw) + (grip.z - h.z) * Math.sin(t.pose.yaw));
+          this.fx.result("Camera", across, angleDiff(this.host.motion.heading, t.pose.yaw), "Hooked: gripper across the bar");
+          this.attach("hooked");
         },
       },
       this.done(),
     ];
-    this.running = "trolley";
-    this.host.changed();
-    if (!this.host.driveThen(worldToCell(preX, d.z), pre, steps)) {
-      this.running = null;
-      this.host.changed();
-    }
   }
 
-  private push(toCheckout: boolean) {
-    const t = this.trolley;
-    if (!t?.docked || this.running) return;
-    const target = toCheckout ? t.checkout : t.home;
-    const x = t.handle(target[0]).x - ARM_TO_HANDLE;
+  /** the trolley rides with the robot from here: lifted on the deck, or hooked to the arm */
+  private attach(mode: "lifted" | "hooked") {
+    const t = this.trolley!;
+    const m = this.host.motion;
+    const dx = t.pose.x - m.x;
+    const dz = t.pose.z - m.z;
+    const c = Math.cos(m.heading);
+    const sn = Math.sin(m.heading);
+    this.rel = { x: dx * c + dz * sn, z: -dx * sn + dz * c, yaw: t.pose.yaw - m.heading };
+    t.mode = mode;
+    t.status(mode);
+    // its spot is free while it travels
+    const [cx, cy] = t.at === "home" ? t.homeCell : t.checkoutCell;
+    this.host.setCell(cx, cy, FLOOR);
+    this.host.changed();
+  }
+
+  /** where the robot has to be (facing +x) for the trolley it carries to sit on a spot */
+  private robotFor(spot: [number, number]): [number, number] {
+    const r = this.rel!;
+    return [spot[0] - r.x, spot[1] - r.z];
+  }
+
+  /** carry or drag it to the other spot, square to the aisle */
+  private move() {
+    const t = this.trolley!;
+    if (t.mode === "free" || this.running) return;
+    const to = t.at === "home" ? "checkout" : "home";
+    const [x, z] = this.robotFor(to === "home" ? t.home : t.checkout);
     this.running = "trolley";
     this.host.changed();
     this.host.run([
-      { kind: "line", to: [x, target[1]], speed: 1.0 },
-      {
-        kind: "call",
-        fn: () => {
-          t.at = toCheckout ? "checkout" : "home";
-        },
-      },
+      { kind: "turn", heading: 0 },
+      { kind: "line", to: [x, z], speed: t.mode === "lifted" ? 0.9 : 0.75 },
+      { kind: "call", fn: () => (t.at = to) },
       this.done(),
     ]);
   }
 
-  private undockSteps(): Step[] {
+  /**
+   * If it's between spots, take it on to the nearer one. Returns the steps, and where the robot
+   * ends up, so what follows can be planned now (these steps run ahead of whatever comes next).
+   */
+  private finishAt(): { steps: Step[]; x: number; z: number; h: number } {
     const t = this.trolley!;
-    // stopped halfway? push it on to the nearer spot first, so it never ends up between cells
-    const px = t.group.position.x;
-    const at = Math.abs(px - t.home[0]) <= Math.abs(px - t.checkout[0]) ? "home" : "checkout";
-    const spot = at === "home" ? t.home : t.checkout;
-    const x = t.handle(spot[0]).x - ARM_TO_HANDLE;
-    const z = spot[1];
-    const above = t.handle(spot[0]);
-    above.y += 0.16;
+    const m = this.host.motion;
+    const near = Math.abs(t.pose.x - t.home[0]) <= Math.abs(t.pose.x - t.checkout[0]) ? "home" : "checkout";
+    const spot = near === "home" ? t.home : t.checkout;
+    const steps: Step[] = [];
+    let end = { x: m.x, z: m.z, h: m.heading };
+    if (Math.hypot(t.pose.x - spot[0], t.pose.z - spot[1]) > 0.05) {
+      const [x, z] = this.robotFor(spot);
+      steps.push({ kind: "turn", heading: 0 }, { kind: "line", to: [x, z], speed: 0.8 });
+      end = { x, z, h: 0 };
+    }
+    steps.push({ kind: "call", fn: () => (t.at = near) });
+    return { steps, ...end };
+  }
+
+  /** the trolley stands on its own again: it settles a little, and its spot is an obstacle */
+  private detach() {
+    const t = this.trolley!;
+    const rand = this.host.rand;
+    t.mode = "free";
+    this.rel = null;
+    t.setPose(t.pose.x + (rand() - 0.5) * 0.04, t.pose.z + (rand() - 0.5) * 0.04, t.pose.yaw + (rand() - 0.5) * 0.08);
+    t.status("idle");
+    const [cx, cy] = t.at === "home" ? t.homeCell : t.checkoutCell;
+    this.host.setCell(cx, cy, SOLID);
+    this.host.changed();
+  }
+
+  private putDownSteps(): Step[] {
+    const f = this.finishAt();
     return [
-      { kind: "line", to: [x, z], speed: 1.0 },
+      ...f.steps,
+      { kind: "lift", to: 0, dur: 0.9 },
+      { kind: "call", fn: () => this.detach() },
+      // out the way it came in, between the legs
+      { kind: "line", to: [f.x - Math.cos(f.h) * 1.45, f.z - Math.sin(f.h) * 1.45], speed: 0.8 },
+    ];
+  }
+
+  private unhookSteps(): Step[] {
+    const f = this.finishAt();
+    const g = this.hookLocal;
+    return [
+      ...f.steps,
       { kind: "grip", open: 1, dur: 0.2 },
-      { kind: "arm", q: this.ik(above, x, z, 0), dur: 0.3 },
-      {
-        kind: "call",
-        fn: () => {
-          t.at = at;
-          t.docked = false;
-          t.status("idle");
-          t.setPose(spot[0], spot[1]);
-          // the spot it stands on is an obstacle again
-          const [hx, hy] = at === "home" ? t.homeCell : t.checkoutCell;
-          this.host.setCell(hx, hy, SOLID);
-          this.host.changed();
-        },
-      },
-      { kind: "line", to: [x - 0.45, z], speed: 0.9 },
+      { kind: "arm", q: solveIK(g[0], g[1] + 0.14, g[2]).q, dur: 0.3 },
+      { kind: "call", fn: () => this.detach() },
+      { kind: "line", to: [f.x - Math.cos(f.h) * 0.45, f.z - Math.sin(f.h) * 0.45], speed: 0.8 },
       { kind: "arm", q: STOW, dur: 0.5 },
     ];
   }
 }
 
-/** robot centre to handle, along its heading, when docked: the arm reaches forward and up */
-const ARM_TO_HANDLE = 0.385;
-/** robot centre to trolley centre when docked */
-const DOCK_GAP = ARM_TO_HANDLE + 0.55;
+/** robot centre to trolley centre when hooked: the arm reaches up and forward to the handle */
+const HOOK_GAP = 1.16;

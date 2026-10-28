@@ -96,15 +96,20 @@ before the robot sets off. Every room is a chapter of his career, and walking
 | Object | Room | Kind | What happens |
 | -- | -- | -- | -- |
 | Blocks world | Centrale | active | **Solve with PDDL**: plan, drive to the table, pick and place. **New goal**: random towers |
-| Trolley | Coalescent | active | **Detect & dock**, **Push to checkout** / **back**, **Undock** |
+| Trolley | Coalescent | active | **Dock under** (LiDAR + ICP, or camera), then **carry** and **put down**; or **hook the handle** and **drag** |
 | MAPF swarm | TII | passive | The six robots replan around M4 and ring it |
-| Flock | SIRB.AI | passive | Thirty drones flock with M4, at its height when it flies |
+| Flock | SIRB.AI | passive | Thirty drones escort M4 on a mesh radio; **jam** it, **fail a drone**, **short range**, **bring them back** |
 | Pendulum | Centrale | passive | Balances by itself |
 
+- **M4's kit** (`src/maze/m4.ts`): an RGB-D camera on the nose (the first-person
+  view and the camera window are its lens), a LiDAR low in the front bumper at
+  the height of a trolley's legs, a lift deck in the middle of the back, and
+  the arm on the left flank.
 - **The arm** (`src/maze/arm.ts`): a turret, a shoulder, an elbow and a wrist
   that keeps the gripper pointing down, so reaching a point is a 3-DOF problem
-  with a closed-form, elbow-up solution. It folds flat along the spine, and
-  stays folded in the air.
+  with a closed-form, elbow-up solution. It folds flat along its side, and
+  stays folded in the air. For the blocks, M4 stands so the arm is centred on
+  the table.
 - **The PDDL planner** (`src/maze/pddl.ts`) parses the domain and the problem
   from the same text the panel shows, grounds every action over the objects,
   and runs A* with h_max (admissible, so plans are optimal). Four blocks
@@ -114,9 +119,33 @@ before the robot sets off. Every room is a chapter of his career, and walking
   table, so every move targets where the blocks will be. Callbacks in the
   step queue hand a block to the gripper and back, and tick the plan in the
   panel.
-- **Docking** lines up behind the trolley, grabs the handle, and pushes it in
-  a straight line. Parked, its cell is an obstacle; docked, it isn't. Both
-  costmap layers and the baked floor shadow are rebuilt when it moves.
+- **Docking under the trolley** (`src/maze/dock.ts`). The trolley stands on
+  four legs wrapped in retro-reflective tape, with a frame high enough for M4
+  to drive under, and starts a little askew (5°, a few cm), so it has to be
+  found, not assumed:
+  - **LiDAR + ICP**: one 270° sweep from the bumper; the legs come back bright.
+    Point-to-point ICP aligns a model of the four legs to the bright returns,
+    from where the map says the trolley is. The LiDAR only sees the near side of
+    a leg, so returns only pair with model points facing the sensor (otherwise
+    a thin leg's arc fits as well on the back of the model, a few cm off). It
+    converges in about eight iterations to a few mm; the robot drives in on the
+    estimated axis and lifts.
+  - **Camera**: the legs' feet are found in the image (with a pixel or so of
+    noise), each pixel's ray is cast down to the floor, and the leg template is
+    fitted to those floor points: a ground-plane PnP. The error grows with the
+    square of the range, so it looks from 2.6 m, drives in along that estimate,
+    and looks again from 2 m. A centimetre or two.
+  - **Hook**: the camera estimate again, then the arm reaches the handle bar and
+    the trolley is dragged on its casters.
+  - Each dock reports its error against where the trolley really is. Parked,
+    the trolley's cell is an obstacle; carried, it isn't; both costmap layers
+    and the baked floor shadow are rebuilt when it moves.
+- **The swarm's radio** (`src/maze/swarm.ts`): drones link to the drones in
+  radio range; jamming and failures cut links. Union-find gives the groups;
+  power iteration on the graph Laplacian gives λ₂, the algebraic connectivity.
+  A drone cut off from the main group flies back toward the nearest drone still
+  in it, slots are by rank among the drones still flying (so the formation
+  closes up after a failure), and the formation shrinks with the radio range.
 - **Anything else you ask for lets go first**: a held block goes back on the
   table, a docked trolley is pushed to the nearest spot and released, and the
   arm folds. Solve again and the planner starts from wherever the blocks are.
@@ -184,6 +213,8 @@ src/maze/pddl.ts        a small PDDL parser, grounder and A* (h_max) planner; th
 src/maze/blocks.ts      the blocks-world table
 src/maze/tasks.ts       active interactions: PDDL plans and docking compiled into motion steps
 src/maze/sensors.ts     object detector with tracks, the camera's view fan, the first-person HUD, depth shader
+src/maze/dock.ts        trolley perception: LiDAR scan, ICP, ground-plane camera pose, and how they're drawn
+src/maze/swarm.ts       the swarm's radio network: links, groups, λ₂
 src/maze/drive.ts       differential-drive kinematics + pure pursuit
 src/maze/mapf.ts        prioritized space-time A* for the swarm room
 src/maze/world.ts       renderer, views, sensors, input, hover cards, planning, preview, tour, sleep

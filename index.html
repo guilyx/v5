@@ -344,9 +344,19 @@
               <span class="chip chip-active">Active</span>
             </div>
             <p>
-              Drive in and the detector locks onto the trolley. M4 lines up behind it, grabs the handle with its arm, and
-              pushes it to the checkout. The costmap follows the trolley wherever it's parked.
+              It's built for robots that dock underneath, and someone left it a little askew. Three ways in:
             </p>
+            <ul class="try-list">
+              <li>
+                <b>LiDAR + ICP.</b> Its legs carry retro-reflective tape. One sweep, keep the bright returns, fit the leg
+                model with ICP, drive under, lift. A few millimetres.
+              </li>
+              <li>
+                <b>Camera.</b> Find the legs' feet in the image, cast each pixel's ray to the floor, fit the legs. Pixels
+                cover more floor further away, so it looks twice. A centimetre or two.
+              </li>
+              <li><b>Hook.</b> The camera estimate again, then the arm grabs the handle and drags it.</li>
+            </ul>
             <div class="try-actions"></div>
           </section>
         </div>
@@ -457,12 +467,17 @@
           </p>
           <section class="try maze-only" data-ix="flock" aria-labelledby="try-flock">
             <div class="try-head">
-              <h3 id="try-flock">Try it: fly with the flock</h3>
+              <h3 id="try-flock">Try it: fly with the flock, then break its radio</h3>
               <span class="chip chip-passive">Passive</span>
             </div>
             <p>
-              Come into the room, rolling or flying, and the drones form up around M4 and follow you, keeping their distance
-              from each other and from you. Leave, and they go back to their circle.
+              Come in, rolling or flying, and the drones escort M4. The lines are their radio links: each drone only hears
+              its neighbours. The readout over them counts the groups and λ₂, the network's algebraic connectivity (0 when
+              it has split).
+            </p>
+            <p>
+              <b>Jam</b> part of it and the cut-off drones fly back to the group. <b>Fail</b> the best-connected drone and the
+              formation closes up. <b>Short range</b> and it tightens so neighbours stay in reach.
             </p>
             <div class="try-actions"></div>
           </section>

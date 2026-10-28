@@ -639,7 +639,7 @@ let cardRaf = 0;
 
 /** the buttons for what you can do with an object; rebuilt only when the choices change */
 function actionButtons(holder: HTMLElement, id: string, acts: IxAction[], inCard: boolean) {
-  const sig = acts.map((a) => a.id).join(",");
+  const sig = acts.map((a) => `${a.id}:${a.label}`).join(",");
   if (holder.dataset.sig === sig) return;
   holder.dataset.sig = sig;
   const hadFocus = holder.contains(document.activeElement);

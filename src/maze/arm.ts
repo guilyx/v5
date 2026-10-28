@@ -3,25 +3,26 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import { PAL, clay, plain, tint } from "./gfx";
 
 /**
- * A small arm on M4's back: a turret (yaw), a shoulder and an elbow (pitch), and a wrist that
- * always keeps the gripper pointing straight down, so picking and placing is a 3-DOF problem
- * with a closed-form solution. It folds flat along the spine to stow, and stays stowed in the air.
+ * A small arm on M4's left flank: a turret (yaw), a shoulder and an elbow (pitch), and a wrist
+ * that always keeps the gripper pointing straight down, so picking and placing is a 3-DOF problem
+ * with a closed-form solution. It folds flat along the side to stow (the middle of the back is
+ * the lift deck's), and stays stowed in the air.
  *
- * All lengths are in the robot's local, unscaled frame (+x forward, +y up).
+ * All lengths are in the robot's local, unscaled frame (+x forward, +y up, +z right of the nose).
  */
 
-/** where the turret is mounted on the shell */
-export const ARM_BASE = { x: -0.03, y: 0.4 };
-const TURRET_H = 0.06;
+/** where the turret is mounted: on a bracket off the left side of the shell */
+export const ARM_BASE = { x: -0.04, y: 0.34, z: -0.16 };
+const TURRET_H = 0.08;
 export const L1 = 0.46;
-export const L2 = 0.44;
+export const L2 = 0.47;
 /** wrist to the grip point between the fingers */
 export const LG = 0.12;
 const SHOULDER_Y = ARM_BASE.y + TURRET_H;
 
 /** yaw, shoulder, elbow */
 export type Joints = [number, number, number];
-/** folded along the spine: the upper arm points back, the forearm folds forward over it */
+/** folded along the side: the upper arm points back, the forearm folds forward over it */
 export const STOW: Joints = [0, Math.PI + 0.12, -Math.PI - 0.07];
 
 export interface ArmParts {
@@ -40,8 +41,14 @@ export function buildArm(shared?: THREE.Material): ArmParts {
   const dark = "#3a3840";
 
   const group = new THREE.Group();
-  group.position.set(ARM_BASE.x, ARM_BASE.y, 0);
-  group.add(part([[new THREE.CylinderGeometry(0.055, 0.06, 0.02, 20).translate(0, 0.01, 0), dark]]));
+  group.position.set(ARM_BASE.x, ARM_BASE.y, ARM_BASE.z);
+  group.add(
+    part([
+      [new THREE.CylinderGeometry(0.05, 0.055, 0.02, 20).translate(0, 0.01, 0), dark],
+      // the bracket back to the shell
+      [new THREE.BoxGeometry(0.09, 0.03, 0.06).translate(0, -0.005, 0.04), dark],
+    ]),
+  );
 
   const turret = new THREE.Group();
   turret.add(
@@ -78,11 +85,13 @@ export function buildArm(shared?: THREE.Material): ArmParts {
   wrist.add(
     part([
       [new THREE.CylinderGeometry(0.024, 0.024, 0.05, 12).rotateX(Math.PI / 2), dark],
-      [new THREE.BoxGeometry(0.04, 0.03, 0.12).translate(0.035, 0, 0), dark],
+      // the gripper rail the fingers slide along
+      [new THREE.BoxGeometry(0.04, 0.29, 0.03).translate(0.035, 0, 0), dark],
     ]),
   );
   elbow.add(wrist);
-  const fingerGeo = mergeGeometries([tint(plain(new THREE.BoxGeometry(0.075, 0.026, 0.016).translate(0.075 + 0.0375, 0, 0)), PAL.accent)]);
+  // the fingers close across the arm's plane: on a bar, they straddle it
+  const fingerGeo = mergeGeometries([tint(plain(new THREE.BoxGeometry(0.075, 0.016, 0.03).translate(0.075 + 0.0375, 0, 0)), PAL.accent)]);
   const fingers = [new THREE.Mesh(fingerGeo, mat), new THREE.Mesh(fingerGeo, mat)];
   for (const f of fingers) wrist.add(f);
   const grip = new THREE.Group();
@@ -98,9 +107,9 @@ export function buildArm(shared?: THREE.Material): ArmParts {
       elbow.rotation.z = q[2];
       wrist.rotation.z = -(q[1] + q[2]) - Math.PI / 2;
       // closed, the fingers just touch a block's faces; open, they clear it
-      const z = 0.094 + 0.04 * open;
-      fingers[0].position.z = z;
-      fingers[1].position.z = -z;
+      const y = 0.094 + 0.04 * open;
+      fingers[0].position.y = y;
+      fingers[1].position.y = -y;
     },
   };
 }
@@ -111,8 +120,9 @@ export function buildArm(shared?: THREE.Material): ArmParts {
  */
 export function solveIK(px: number, py: number, pz: number): { q: Joints; reach: boolean } {
   const dx = px - ARM_BASE.x;
-  const r = Math.hypot(dx, pz);
-  const yaw = Math.atan2(-pz, dx);
+  const dz = pz - ARM_BASE.z;
+  const r = Math.hypot(dx, dz);
+  const yaw = Math.atan2(-dz, dx);
   // the wrist sits a gripper-length above the grip point
   const h = py + LG - SHOULDER_Y;
   const D = (r * r + h * h - L1 * L1 - L2 * L2) / (2 * L1 * L2);
