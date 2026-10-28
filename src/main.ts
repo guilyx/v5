@@ -1,5 +1,5 @@
 import "./styles.css";
-import { H, ROOMS, W, WALL, buildMaze, idx, wallRuns } from "./maze/layout";
+import { H, ROOMS, W, WALL, buildMaze, facade, idx, outdoors, wallRuns } from "./maze/layout";
 import type { Feed, HoverInfo, MazeApi, MotionState, PlanRow, View } from "./maze/world";
 import type { IxAction, PddlView } from "./maze/tasks";
 import type { PlanKind } from "./maze/modal";
@@ -170,15 +170,22 @@ function paintMapBase() {
   }
   const k = mmBase.getContext("2d")!;
   k.setTransform(dpr * mmScale, 0, 0, dpr * mmScale, 0, 0);
-  k.fillStyle = "#f8f3e9";
-  k.fillRect(0, 0, W, H);
+  // the building on paper, the outdoors on sand
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      k.fillStyle = outdoors(x, y) ? "#ecd3a2" : "#f8f3e9";
+      k.fillRect(x, y, 1.02, 1.02);
+    }
   ROOMS.forEach((r) => {
     k.fillStyle = r.dark ? "#4a4c53" : r.tint;
     k.fillRect(r.x - 0.5, r.y - 0.5, r.w + 1, r.h + 1);
   });
-  const runs = wallRuns(W, H, (x, y) => x >= 0 && y >= 0 && x < W && y < H && maze.grid[idx(x, y)] === WALL, () => 0, 0.5);
-  k.fillStyle = "#c79466";
-  for (const b of runs) k.fillRect(b.cx - b.sx / 2, b.cz - b.sz / 2, b.sx, b.sz);
+  const wallAt = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && maze.grid[idx(x, y)] === WALL;
+  const runs = wallRuns(W, H, wallAt, (x, y) => (facade(x, y) ? 2 : outdoors(x, y) ? 1 : 0), 0.5);
+  for (const b of runs) {
+    k.fillStyle = b.g === 2 ? "#8a7d6b" : b.g === 1 ? "#b98652" : "#c79466";
+    k.fillRect(b.cx - b.sx / 2, b.cz - b.sz / 2, b.sx, b.sz);
+  }
   k.textAlign = "center";
   k.textBaseline = "middle";
   ROOMS.forEach((r, i) => {
@@ -660,6 +667,19 @@ function actionButtons(holder: HTMLElement, id: string, acts: IxAction[], inCard
   );
   if (hadFocus) (holder.firstElementChild as HTMLElement | null)?.focus();
 }
+
+/** live panels in the story: what the object on screen is saying, while its box is in view */
+setInterval(() => {
+  if (!api || document.hidden) return;
+  for (const box of tryBoxes) {
+    const pre = box.querySelector<HTMLElement>(".try-live");
+    if (!pre) continue;
+    const r = box.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > window.innerHeight || !r.width) continue;
+    const text = api.live(box.dataset.ix!);
+    if (text !== null && pre.textContent !== text) pre.textContent = text;
+  }
+}, 500);
 
 function refreshActions() {
   if (!api) return;

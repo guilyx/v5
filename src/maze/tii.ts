@@ -5,6 +5,7 @@ import { SANS, roundRect } from "./paint";
 import { PAL, blobTexture, clay } from "./gfx";
 import { Kit, cellAt, detOf, glow, gx, gz, instanceBoxes, paintStat, paintWord, wallScreen } from "./kit";
 import { buildM4 } from "./m4";
+import { camel, dune, ghaf, palm, shrub, windsock } from "./outdoor";
 import type { Ctx, Det, Fx, Interactable } from "./props";
 
 /**
@@ -118,12 +119,28 @@ export function c2(ctx: Ctx, r: RoomDef): Fx {
     units.push({ name: `UAV-${i + 1}`, kind: "uav", pos: p.clone(), vel: new THREE.Vector3(), home: p, route: [], wp: 0, task: "on pad", battery: 100, heading: -Math.PI / 2 });
   }
   for (let i = 0; i < 2; i++) {
-    const p = new THREE.Vector3(X(10.2), 0, Z(5.2 + i * 1.5));
+    // clear of the door from the building, which opens at row 4 of the east wall
+    const p = new THREE.Vector3(X(10.2), 0, Z(6.6 + i * 1.6));
     padK.box(0.8, 0.02, 0.7, p.x, 0.01, p.z, "#3b434c");
     units.push({ name: `UGV-${i + 1}`, kind: "ugv", pos: p.clone(), vel: new THREE.Vector3(), home: p, route: [], wp: 0, task: "docked", battery: 100, heading: Math.PI });
   }
   g.add(padK.mesh());
   paintWord(ctx, "SECTOR B", r.ink, X(9), Z(2.4), 26, 5);
+
+  // out in the desert: the screens ride on a command trailer, a palm for shade, a windsock for the drones
+  const out = new Kit();
+  out.box(10.2, 1.45, 0.5, X(5.5), 0.95, Z(0.02), "#e9e4d8");
+  out.box(10.2, 0.08, 0.52, X(5.5), 1.7, Z(0.02), "#c9c2b2");
+  for (const wx of [1.2, 2.0, 9.0, 9.8]) out.cyl(0.2, 0.2, 0.14, X(wx), 0.2, Z(0.3), "#2b2a31", 14, [Math.PI / 2, 0, 0]);
+  out.box(1.4, 0.08, 0.08, X(5.5), 1.95, Z(0.0), "#9aa0ab");
+  out.cyl(0.02, 0.02, 0.9, X(10.1), 2.15, Z(0.0), "#9aa0ab", 6);
+  palm(out, X(0.5), Z(10.4), 2.35, 0.15, 1);
+  shrub(out, X(0.2), Z(9.6), 0.9);
+  shrub(out, X(10.6), Z(1.0), 0.8);
+  g.add(out.mesh());
+  const sock = windsock();
+  sock.group.position.set(X(10.5), 0, Z(0.6));
+  g.add(sock.group);
 
   const uavs = units.filter((u) => u.kind === "uav");
   const ugvs = units.filter((u) => u.kind === "ugv");
@@ -473,6 +490,9 @@ export function c2(ctx: Ctx, r: RoomDef): Fx {
         }
       }
       place();
+      // the afternoon shamal swings the windsock
+      sock.sock.rotation.y = 0.5 + 0.25 * Math.sin(now * 0.7) + 0.08 * Math.sin(now * 3.1);
+      sock.sock.rotation.z = -0.15 - 0.1 * Math.sin(now * 1.3);
       // the screens redraw while you can see them
       if (near && now - drawAt > 0.33) {
         drawAt = now;
@@ -492,11 +512,13 @@ export function swarmControl(ctx: Ctx, r: RoomDef): Fx {
   const N = 24;
   const K_NN = 7;
   const pillars: [number, number][] = [cellAt(r, 2, 6), cellAt(r, 6, 4)];
+  // out over the dunes: two date palms for the flock to flow round, dunes in the corners
   const pk = new Kit();
-  for (const [x, z] of pillars) {
-    pk.cyl(0.32, 0.38, 2.2, x, 1.1, z, "#e7b7a5", 20);
-    pk.cyl(0.42, 0.42, 0.06, x, 0.03, z, "#9a3f22", 20);
-  }
+  pillars.forEach(([x, z], i) => palm(pk, x, z, 2.5, 0.12, i * 2 + 0.5));
+  dune(pk, X(8.6), Z(0.7), 1.3, 1.0, 0.42, 0.4, "#ebc98c");
+  dune(pk, X(0.9), Z(10.2), 1.6, 1.1, 0.4, -0.3, "#ebc98c");
+  shrub(pk, X(8.4), Z(2.4), 0.9);
+  shrub(pk, X(1.9), Z(9.6), 0.8);
   g.add(pk.mesh());
   // what the new swarm autonomy architecture saved, painted on the floor
   paintStat(ctx, "−74%", "ONBOARD CPU", r.ink, ...cellAt(r, 1.6, 0.9));
@@ -860,17 +882,34 @@ export function orchestration(ctx: Ctx, r: RoomDef): Fx {
     blocked.add(key(x, y));
   }
   g.add(pk.mesh());
+  // the stations are solar panels out in the sun (the robots inspect them), each with its status lamp
   const lamps = stations.map(([x, y]) => {
     const [wx, wz] = C(x, y);
     const k = new Kit();
-    k.cyl(0.16, 0.2, 0.7, wx, 0.35, wz, "#c9bfb2", 16);
+    for (const sx of [-0.32, 0.32]) k.box(0.05, 0.45, 0.05, wx + sx, 0.22, wz + 0.1, "#8a8f98");
+    const panel = new THREE.BoxGeometry(0.92, 0.04, 0.7);
+    panel.rotateX(0.5);
+    panel.translate(wx, 0.5, wz);
+    k.add(panel, "#22355a");
+    for (let i = -1; i <= 1; i++) {
+      const line = new THREE.BoxGeometry(0.012, 0.045, 0.7);
+      line.rotateX(0.5);
+      line.translate(wx + i * 0.23, 0.505, wz);
+      k.add(line, "#8fa6c9");
+    }
+    k.cyl(0.02, 0.02, 0.5, wx + 0.42, 0.55, wz - 0.25, "#8a8f98", 6);
     g.add(k.mesh());
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 10), clay({ color: "#2f8f5b", emissive: 0.9 }));
-    lamp.position.set(wx, 0.82, wz);
+    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.08, 14, 10), clay({ color: "#2f8f5b", emissive: 0.9 }));
+    lamp.position.set(wx + 0.42, 0.84, wz - 0.25);
     g.add(lamp);
     blocked.add(key(x, y));
     return lamp;
   });
+  // more of the farm along the south edge, and a palm by the docks
+  const farm = new Kit();
+  palm(farm, C(0, 9)[0] - 0.1, C(0, 9)[1] + 0.3, 2.2, 0.1, 3);
+  g.add(farm.mesh());
+  blocked.add(key(0, 9));
   const barrierMesh = new THREE.Group();
   g.add(barrierMesh);
 
@@ -1246,10 +1285,20 @@ export function planTrack(ctx: Ctx, r: RoomDef): Fx {
   };
   const rand = rng(31);
   for (let i = 0; i < 9; i++) addRock(X(3 + rand() * 7), Z(2.2 + rand() * 7.6), 0.25 + rand() * 0.25);
-  // shrubs, for the look
+  // gravel plain: shrubs for the look, two ghaf trees it has to go round
   const sk = new Kit();
-  for (let i = 0; i < 14; i++) sk.cyl(0.09, 0.14, 0.18, X(0.6 + rand() * (r.w - 1.2)), 0.09, Z(1.6 + rand() * (r.h - 2.2)), i % 2 ? "#8ea05a" : "#a9b56b", 7);
+  for (let i = 0; i < 14; i++) shrub(sk, X(0.6 + rand() * (r.w - 1.2)), Z(1.6 + rand() * (r.h - 2.2)), 0.55 + rand() * 0.3, i % 2 ? "#8ea05a" : "#a9b56b");
+  const trees: { x: number; z: number; r: number }[] = [
+    { x: X(3.2), z: Z(2.4), r: 0.35 },
+    { x: X(9.6), z: Z(9.6), r: 0.35 },
+  ];
+  trees.forEach((t, i) => ghaf(sk, t.x, t.z, 1.05, i * 2));
   g.add(sk.mesh());
+  // and a camel, who crosses when you ask, and has right of way
+  const cam = camel();
+  cam.group.scale.setScalar(0.6);
+  g.add(cam.group);
+  const walker = { x: X(r.w - 0.9), z: Z(r.h - 0.5), r: 0.5, heading: Math.PI, from: 0, to: 0, t: -1, lane: 0 };
   const start: [number, number] = [X(1.2), Z(r.h / 2 + 0.5)];
   const goalPt: [number, number] = [X(r.w - 1.2), Z(r.h / 2 + 0.5)];
   for (const [px, pz] of [start, goalPt]) {
@@ -1273,7 +1322,7 @@ export function planTrack(ctx: Ctx, r: RoomDef): Fx {
   const you = { x: 0, z: 0, r: 0.45, on: false };
   const rebuild = () => {
     const data = costTex.image.data as Uint8Array;
-    const obstacles = you.on ? [...rocks, you] : rocks;
+    const obstacles = [...rocks, ...trees, walker, ...(you.on ? [you] : [])];
     for (let j = 0; j < FH; j++)
       for (let i = 0; i < FW; i++) {
         const x = fx0 + (i + 0.5) * RES;
@@ -1564,6 +1613,20 @@ export function planTrack(ctx: Ctx, r: RoomDef): Fx {
     }
   };
 
+  /** the camel walks across the field, through the path ahead; the planner goes round it as it goes */
+  const camelCross = () => {
+    if (walker.t >= 0) return;
+    const p = path[Math.min(path.length - 1, nearest + 18)] ?? [X(r.w / 2), Z(r.h / 2)];
+    walker.lane = THREE.MathUtils.clamp(p[0], X(2.5), X(r.w - 2.5));
+    walker.x = walker.lane;
+    walker.from = Z(1.3);
+    walker.to = Z(r.h - 0.4);
+    walker.z = walker.from;
+    walker.heading = Math.PI / 2;
+    walker.t = 0;
+  };
+  let camelAt = 0;
+
   const ix: Interactable[] = [
     {
       id: "field",
@@ -1578,10 +1641,12 @@ export function planTrack(ctx: Ctx, r: RoomDef): Fx {
         { id: "rock", label: "Drop a rock in its way", primary: true },
         { id: "ctrl", label: `Controller: ${NAMES[ctrl]} → ${NAMES[ctrl === "pursuit" ? "stanley" : ctrl === "stanley" ? "mpc" : "pursuit"]}` },
         { id: "wind", label: wind ? "Calm" : "Wind gusts" },
+        { id: "camel", label: "Camel crossing" },
         ...(rocks.some((k) => k.mine) ? [{ id: "clear", label: "Clear your rocks" }] : []),
       ],
       run: (a) => {
-        if (a === "rock") dropRock();
+        if (a === "camel") camelCross();
+        else if (a === "rock") dropRock();
         else if (a === "ctrl") {
           ctrl = ctrl === "pursuit" ? "stanley" : ctrl === "stanley" ? "mpc" : "pursuit";
           errs.length = 0;
@@ -1592,6 +1657,7 @@ export function planTrack(ctx: Ctx, r: RoomDef): Fx {
     },
   ];
   const det: Det = detOf("field-m4", "robot");
+  const camelDet: Det = detOf("camel", "camel");
   let plotAt = -1;
   return {
     room: 0,
@@ -1599,7 +1665,8 @@ export function planTrack(ctx: Ctx, r: RoomDef): Fx {
     ix,
     detect(out) {
       det.box.setFromObject(unit.root);
-      out.push(det);
+      camelDet.box.setFromObject(cam.group);
+      out.push(det, camelDet);
     },
     hud() {
       return {
@@ -1629,6 +1696,29 @@ export function planTrack(ctx: Ctx, r: RoomDef): Fx {
           }
         }
       }
+      // the camel: walk, and every half second tell the costmap where it is
+      if (walker.t >= 0) {
+        walker.t += dt;
+        walker.z = Math.min(walker.to, walker.from + walker.t * 0.45);
+        cam.stride(walker.t * 5, 1);
+        if (now - camelAt > 0.5 || walker.z >= walker.to) {
+          camelAt = now;
+          rebuild();
+          const blocking = path.slice(nearest).some(([x, z]) => Math.hypot(x - walker.x, z - walker.z) < walker.r + ROBOT_R + 0.15);
+          if (blocking) {
+            const np = plan([st.x, st.z], toGoal ? goalPt : start);
+            if (np) {
+              path = np;
+              nearest = 0;
+              replans++;
+              setPathLine();
+            }
+          }
+        }
+        if (walker.z >= walker.to) walker.t = -1;
+      } else cam.stride(0, 0);
+      cam.group.position.set(walker.x, 0, walker.z);
+      cam.group.rotation.y = -walker.heading;
       let left = Math.min(dt, 0.1);
       while (left > 1e-4) {
         const h = Math.min(left, 1 / 30);

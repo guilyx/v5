@@ -11,7 +11,9 @@ walls, a paper floor, and a toy **M4**, the Caltech robot that rolls and flies
 multi-modal planner shows how it would get there: rolling, flying over the
 walls, or morphing between the two. Click, and a ghost rehearses the route
 before the robot sets off. Every room is a chapter of his career, and walking
-(or flying) into one opens its story.
+(or flying) into one opens its story. The first chapters are rooms inside a
+building; through its glass doors, from TII on, the maze is outdoors, in the
+Abu Dhabi sun.
 
 ## How you move through it
 
@@ -53,21 +55,35 @@ before the robot sets off. Every room is a chapter of his career, and walking
 | -- | -- | -- |
 | 00 | Entrance | His name painted on the floor, the brand mark, a charging dock |
 | 01 | Nantes | A resistor, a capacitor and a breadboard |
-| 02 | Hiventive | The room is the chip: graphite package, gold pins, an STM32 die with TIM, I2C, CAN, GPIO, USART |
+| 02 | Hiventive | The room is the chip: graphite package, gold pins, the STM32's die on the floor, wired to a weather station it runs (SPI, GPIO, UART, CAN) and a logic analyser that decodes the buses |
 | 03 | Coimbra | A small maze on a table that a small robot keeps solving, and two trophies: mapped, unmapped |
-| 04 | Centrale Nantes | The two papers on easels, an inverted pendulum balancing, and a blocks-world table: a PDDL planner, and M4's arm carries out the plan |
-| 05 | Coalescent | Supermarket aisles and a trolley that gets a detection box when you walk in; M4 can dock to it and push it to the checkout |
-| 06 | TII · Command & Control | An ops table that maps the room live, a video wall (units, mission log, the whole maze with M4 on it), and four drones and two rovers to task |
-| 07 | TII · Swarm Control | Bird-inspired flocking from seven nearest neighbours, coloured by heading; switch rules off, chase them, or see one drone's view; −74% CPU and −52% bandwidth painted on the floor |
-| 08 | TII · Orchestration | Three rovers, a behavior tree each, an orchestrator, and the trees on the wall lit by what each node returned |
-| 09 | TII · Plan & Track | A field M4 planning through a costmap of rocks and tracking the path with pure pursuit, Stanley or a sampling MPC; the cross-track error on the wall |
-| 10 | Unchained Labs | An intent → agents → jobs graph with pulses running along it |
-| 11 | SIRB.AI | A swarm on a mesh radio you can jam and break, and the self-healing agent on the wall explaining what it does about it |
-| 12 | Projects | The eight project clips on screens; the one you stand at plays |
-| 13 | Off the clock | His photos, printed and scattered on the floor (click one) |
-| 14 | Exit | A finish line, a mailbox, and how to reach him |
+| 04 | Centrale Nantes | The two papers on easels, an inverted pendulum balancing, a MAPF warehouse (logistics robots replanned together by CBS), and a blocks-world table: a PDDL planner, and M4's arm carries out the plan |
+| 05 | Coalescent | Supermarket aisles and a trolley M4 can dock under and carry; behind a rail, the backroom, where three AMRs move roll cages on orders from a VDA 5050 fleet manager |
+| 06 | TII · Command & Control | Out the door, in the sand: an ops table that maps the room live, screens on a command trailer (units, mission log, the whole maze with M4 on it), a windsock, four drones and two rovers to task |
+| 07 | TII · Swarm Control | Over the dunes: bird-inspired flocking from seven nearest neighbours, coloured by heading, round two date palms; switch rules off, chase them, or see one drone's view |
+| 08 | TII · Orchestration | A solar farm: three rovers, a behavior tree each, an orchestrator, the panels they inspect, and the trees on a billboard lit by what each node returned |
+| 09 | TII · Plan & Track | A gravel plain: a field M4 planning through a costmap of rocks and ghaf trees, tracking the path with pure pursuit, Stanley or a sampling MPC; a camel that crosses when asked |
+| 10 | Unchained Labs | A desk on the beach (remote, from Abu Dhabi), and an intent → agents → jobs graph with pulses running along it |
+| 11 | SIRB.AI | A lagoon with flamingos and mangroves; a swarm on a mesh radio you can jam and break, and the self-healing agent explaining what it does about it |
+| 12 | Projects | An open-air courtyard with lanterns: the eight project clips on screens; the one you stand at plays |
+| 13 | Off the clock | His photos, printed and laid out on the sand by the sea (click one) |
+| 14 | Exit | Palms, a mailbox, a finish line at the way out, and how to reach him |
 
-## M4 and its planner
+## Inside, then out
+
+- **Two mazes in one** (`src/maze/layout.ts`): the corridors are carved separately inside the building
+  and outside it, so the only way between them is the door out of Coalescent into C2: sliding glass
+  doors that open as the robot comes (`src/maze/sky.ts`). The building's outer wall is plaster and
+  stands taller; the planner won't fly over it either.
+- **The ground**: paper inside; outside, the floor shader draws wind ripples on sand, dunes, gravel, a
+  lagoon, paving, and a beach whose waves move. Outdoor walls are rammed earth, and the light changes
+  with the zone: a harder sun, a bluer sky, sand bouncing light up from below.
+- **Ride along** (chase or first person) and the difference is plain: inside, a ceiling of tiles and
+  light panels and a glass front onto the desert; outside, the sky, with blown sand drifting low.
+- **What grows there** (`src/maze/outdoor.ts`): date palms, ghaf trees, dunes, shrubs, mangroves,
+  flamingos, a camel, a windsock, parasols, lanterns. All primitives, merged per room.
+
+## M4 and its planner## M4 and its planner
 
 - **The robot** (`src/maze/m4.ts`): a low body on four legs, each ending in a
   shrouded wheel with a propeller inside. To fly, each leg swings up and out
@@ -98,12 +114,15 @@ before the robot sets off. Every room is a chapter of his career, and walking
 
 | Object | Room | Kind | What happens |
 | -- | -- | -- | -- |
+| Weather station | Hiventive | active | **Heatwave / storm / calm**, **Press B1** (°C ⇄ °F), **Probe** SPI, the UART, CAN or GPIO, **Unplug the CAN node** (no ACK: the error counter climbs to error passive) |
+| MAPF warehouse | Centrale | active | **Rush hour** (new jobs for every robot), **Switch to prioritized / CBS**, **Add a robot** |
 | Blocks world | Centrale | active | **Solve with PDDL**: plan, drive to the table, pick and place. **New goal**: random towers |
+| AMR fleet | Coalescent | active | **Pause / resume AMR-02** (the others queue behind it), **Cancel AMR-01's order**, **Drain AMR-03's battery** |
 | Trolley | Coalescent | active | **Dock under** (LiDAR + ICP, or camera), then **carry** and **put down**; or **hook the handle** and **drag** |
 | C2 console | TII · C2 | active | **Survey sector B**, **Escort M4**, **Hold the perimeter**, **Return to base**; a unit low on battery goes home on its own |
 | Flocking | TII · Swarm | passive | **M4 is a predator**, **Follow M4**, switch **separation / alignment / cohesion**, **Show one drone's view** |
 | Behavior trees | TII · Orchestration | active | **Raise an anomaly**, **Drain a battery** (it hands its task back), **Block the middle** (they replan) |
-| Field M4 | TII · Plan & Track | active | **Drop a rock in its way**, switch **controller**, **Wind gusts**; or park M4 in its way and it plans round you |
+| Field M4 | TII · Plan & Track | active | **Drop a rock in its way**, switch **controller**, **Wind gusts**, **Camel crossing**; or park M4 in its way and it plans round you |
 | Swarm | SIRB.AI | passive | Thirty drones escort M4 on a mesh radio; **jam** it, **fail a drone**, **short range**, **bring them back**; the agent on the wall narrates |
 | Pendulum | Centrale | passive | Balances by itself |
 
@@ -146,6 +165,28 @@ before the robot sets off. Every room is a chapter of his career, and walking
   - Each dock reports its error against where the trolley really is. Parked,
     the trolley's cell is an obstacle; carried, it isn't; both costmap layers
     and the baked floor shadow are rebuilt when it moves.
+- **The STM32 weather station** (`src/maze/stm32.ts`, `src/maze/hiventive.ts`): the peripherals are
+  models and the sensors are models of their datasheets. The BME280 driver writes ctrl_hum and
+  ctrl_meas (forced mode) and burst-reads 0xF7..0xFE over SPI (bit 7 of the address: read or write),
+  then compensates with the datasheet's formulas and trimming parameters; the sensor model inverts the
+  same formulas to turn the weather into raw counts. The anemometer and rain gauge are EXTI interrupts
+  (2.4 km/h per hertz, 0.2794 mm per tip). USART2 runs at 115200 8N1 (BRR 0x16D from a 42 MHz APB1).
+  Each sample goes out as a standard CAN frame at 500 kbit/s with its CRC-15 and stuff bits; with the
+  node unplugged the ACK slot stays recessive, the transmit error counter climbs by 8 per attempt, and
+  at 128 the controller goes error passive and keeps retrying, as the spec says. The live panel in the
+  story shows `candump` and the serial port.
+- **MAPF** (`src/maze/mapf.ts`, `src/maze/warehouse.ts`): Conflict-Based Search, with space-time A*
+  (true-distance heuristic, vertex and swap constraints) under a constraint tree ordered by sum of
+  costs; and prioritized planning for comparison. The warehouse is lifelong: whenever a robot picks or
+  drops, all of them are replanned together, at the end of the timestep so nobody jumps. The red rings
+  are the conflicts CBS found and branched on.
+- **VDA 5050** (`src/maze/vda5050.ts`, `src/maze/cmr.ts`): a master control and three AGVs. Orders are
+  nodes and edges with sequence IDs and pick/drop actions; the master releases at most two nodes ahead
+  (the base; the rest is the horizon) and never one another vehicle stands on or holds, and holds a
+  vehicle back from the mouth of a station another is inside, so the one-way loop never deadlocks.
+  The vehicles report state (last node, driving, paused, battery, load, action states, errors); instant
+  actions pause, resume and cancel. The fleet manager's screen draws the roadmap with each base solid
+  and each horizon dashed; the story's live panel shows the latest order as JSON.
 - **The TII rooms** (`src/maze/tii.ts`):
   - **C2**: units fly or drive routes per mission (lawnmower lanes over sector B, a patrol loop that goes
     round the table, stations on the perimeter, an escort ring on M4), drain and recharge batteries, and
@@ -199,15 +240,15 @@ before the robot sets off. Every room is a chapter of his career, and walking
 
 - **Page first.** `index.html` holds every word. The story panel, the list view
   and the no-WebGL fallback are the same HTML; CSS decides how it's laid out.
-  The page's own JS is 7 KB gzipped and draws the minimap without three.js.
+  The page's own JS is 11 KB gzipped and draws the minimap without three.js.
 - **3D second.** three.js loads with a dynamic `import()` once the fonts are in.
 - **The maze** (`src/maze/layout.ts`) is a seeded recursive backtracker over the
   corridor lattice, with rooms carved first, doors opened per side, and some
   dead ends braided into loops. Same seed, same maze, every visit.
-- **Walls** are merged into straight runs: 163 boxes in one `InstancedMesh`.
+- **Walls** are merged into straight runs: about 200 boxes in one `InstancedMesh`.
   Soft clay edges and the dark foot of each wall come from the shader.
 - **Light** is baked: ambient occlusion and the sun's shadow are computed once
-  into a 228×172 texture. No shadow maps, no post-processing.
+  into a 244×228 texture. No shadow maps, no post-processing.
 - **The search** is a float texture with one texel per cell holding the time
   the search closed it and in which mode; the floor shader turns that into the
   fading wash. One upload per plan, nothing per frame.
@@ -240,7 +281,15 @@ src/maze/tasks.ts       active interactions: PDDL plans and docking compiled int
 src/maze/sensors.ts     object detector with tracks, the camera's view fan, the first-person HUD, depth shader
 src/maze/dock.ts        trolley perception: LiDAR scan, ICP, ground-plane camera pose, and how they're drawn
 src/maze/swarm.ts       the swarm's radio network: links, groups, λ₂
+src/maze/stm32.ts       the virtual STM32's weather station: BME280 over SPI, GPIO, UART, CAN frames and errors
+src/maze/hiventive.ts   the chip room: die, copper, weather mast, CAN node, terminal, logic analyser
+src/maze/mapf.ts        multi-agent pathfinding: CBS and prioritized planning
+src/maze/warehouse.ts   Centrale's MAPF testbed: racks, conveyor, robots, lifelong replanning
+src/maze/vda5050.ts     a VDA 5050 master control and its AGVs, and the backroom's roadmap
+src/maze/cmr.ts         Coalescent's backroom: the AMRs, roll cages and the fleet manager's screen
 src/maze/tii.ts         the four TII rooms: C2, swarm control, behavior trees, plan and track
+src/maze/outdoor.ts     palms, ghaf trees, dunes, mangroves, flamingos, a camel, a windsock
+src/maze/sky.ts         ceilings and the glass front for riding along, the sky, the door out, blown sand
 src/maze/kit.ts         shared room parts: primitives, glow, detections, floor paint, wall screens
 src/maze/drive.ts       differential-drive kinematics + pure pursuit
 src/maze/world.ts       renderer, views, sensors, input, hover cards, planning, preview, tour, sleep
