@@ -295,7 +295,7 @@ export class Lidar {
           vA = clamp(1.0 - age / 1.1, 0.0, 1.0);
           vec4 mv = modelViewMatrix * vec4(position, 1.0);
           vDepth = -mv.z;
-          gl_PointSize = vA > 0.0 ? max(2.5, uScale * 0.09 / vDepth) : 0.0;
+          gl_PointSize = vA > 0.0 ? clamp(uScale * 0.09 / vDepth, 2.5, 12.0) : 0.0;
           gl_Position = projectionMatrix * mv;
         }`,
       fragmentShader: /* glsl */ `

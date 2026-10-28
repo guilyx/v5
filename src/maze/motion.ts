@@ -71,6 +71,10 @@ export class Motion {
   aLat = 0;
   /** keys while flying: a direction in the board's frame */
   manual = { x: 0, y: 0 };
+  /** keys in a first-person view: forward (-1..1) and turn (-1..1), relative to the robot */
+  cmd: { v: number; w: number } | null = null;
+  /** can the robot's centre stand here? Driving by hand checks before every step */
+  isClear: (x: number, z: number) => boolean = () => true;
   /** arm joints and gripper opening (0 closed, 1 open) */
   armQ: Joints = [...STOW];
   grip = 0;
@@ -271,7 +275,14 @@ export class Motion {
         if (this.flyStep(dt)) this.next();
       } else if (this.mode === FLY) {
         // no plan: hold position, or fly by hand
-        this.hover(dt, this.manual.x * this.vFly * 0.8, this.manual.y * this.vFly * 0.8);
+        if (this.cmd) {
+          // first person: yaw with the keys, fly along the nose
+          this.heading += this.cmd.w * 2.2 * dt;
+          const sp = this.cmd.v * this.vFly * 0.6;
+          this.hover(dt, Math.cos(this.heading) * sp, Math.sin(this.heading) * sp, true);
+        } else this.hover(dt, this.manual.x * this.vFly * 0.8, this.manual.y * this.vFly * 0.8);
+      } else if (this.cmd) {
+        this.teleRoll(dt, this.cmd);
       } else {
         this.rollStep(dt);
       }
@@ -289,8 +300,32 @@ export class Motion {
     this.vx = this.vz = 0;
   }
 
+  /** drive by hand: speed and turn rate from the keys, sliding along walls instead of entering them */
+  private teleRoll(dt: number, c: { v: number; w: number }) {
+    const d = this.drive;
+    d.active = false;
+    const dv = c.v * 2.2 - d.v;
+    d.v += Math.sign(dv) * Math.min(Math.abs(dv), 6 * dt);
+    d.w += (c.w * 2.6 - d.w) * Math.min(1, dt * 10);
+    this.heading += d.w * dt;
+    const step = d.v * dt;
+    const nx = this.x + Math.cos(this.heading) * step;
+    const nz = this.z + Math.sin(this.heading) * step;
+    if (this.isClear(nx, nz)) {
+      this.x = nx;
+      this.z = nz;
+    } else if (this.isClear(nx, this.z)) this.x = nx;
+    else if (this.isClear(this.x, nz)) this.z = nz;
+    else d.v = 0;
+    this.odo += Math.abs(step);
+    d.x = this.x;
+    d.z = this.z;
+    d.heading = this.heading;
+    this.vx = this.vz = 0;
+  }
+
   /** accelerate toward a target velocity, bank into it, and yaw toward the direction of travel */
-  private hover(dt: number, tvx: number, tvz: number) {
+  private hover(dt: number, tvx: number, tvz: number, holdYaw = false) {
     const dvx = tvx - this.vx;
     const dvz = tvz - this.vz;
     const dv = Math.hypot(dvx, dvz);
@@ -314,7 +349,7 @@ export class Motion {
       this.vz = 0;
     }
     const sp = Math.hypot(this.vx, this.vz);
-    if (sp > 0.4) {
+    if (sp > 0.4 && !holdYaw) {
       let a = Math.atan2(this.vz, this.vx) - this.heading;
       a = Math.atan2(Math.sin(a), Math.cos(a));
       this.heading += Math.sign(a) * Math.min(Math.abs(a), 4.5 * dt);

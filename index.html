@@ -53,11 +53,12 @@
 
     <div class="stage" aria-hidden="true">
       <canvas id="maze"></canvas>
+      <canvas id="overlay" class="overlay"></canvas>
       <div class="stage-loading"><span></span>Building the maze…</div>
     </div>
 
     <p class="hint" id="hint" aria-hidden="true">
-      <span class="hint-mouse">Hover to preview a plan · click to go · F to fly · scroll for the next room</span>
+      <span class="hint-mouse">Hover to preview a plan · click to go · F to fly · V to ride along · scroll for the next room</span>
       <span class="hint-touch">Tap to drive · Fly to take off · swipe up for the next room</span>
     </p>
 
@@ -111,13 +112,48 @@
       <button class="dock-btn dock-fly" id="fly-btn" type="button" aria-pressed="false">
         <span class="db-label">Fly</span><kbd aria-hidden="true">F</kbd>
       </button>
-      <button class="dock-btn" id="cost-btn" type="button" aria-pressed="true">
-        <span class="db-label">Costmap</span><kbd aria-hidden="true">C</kbd>
+      <button class="dock-btn" id="view-btn" type="button">
+        <span class="db-pre">View</span><span class="db-label">Top</span><kbd aria-hidden="true">V</kbd>
+      </button>
+      <button class="dock-btn" id="sensors-btn" type="button" aria-expanded="false" aria-controls="sensors">
+        <span class="db-label">Sensors</span><i class="db-caret" aria-hidden="true"></i>
       </button>
       <span class="cost-legend" aria-hidden="true">
         <i class="cl-lethal"></i>lethal <i class="cl-insc"></i>inscribed <i class="cl-infl"></i>inflated
       </span>
     </div>
+
+    <div class="sensors" id="sensors" role="group" aria-label="Views and sensors" hidden>
+      <p class="sn-title">View <kbd aria-hidden="true">V</kbd></p>
+      <div class="seg" role="radiogroup" aria-label="View">
+        <button type="button" role="radio" aria-checked="true" data-view="top">Top</button>
+        <button type="button" role="radio" aria-checked="false" data-view="chase">Chase</button>
+        <button type="button" role="radio" aria-checked="false" data-view="fpv">First person</button>
+      </div>
+      <p class="sn-title">Sensors</p>
+      <button type="button" class="sw" data-sensor="lidar" aria-pressed="true">
+        <span class="sw-text"><b>LiDAR</b><span>Laser returns off the walls</span></span><kbd aria-hidden="true">L</kbd><i aria-hidden="true"></i>
+      </button>
+      <button type="button" class="sw" data-sensor="cost" aria-pressed="true">
+        <span class="sw-text"><b>Costmap</b><span>Lethal, inscribed, inflated</span></span><kbd aria-hidden="true">C</kbd><i aria-hidden="true"></i>
+      </button>
+      <button type="button" class="sw" data-sensor="detect" aria-pressed="false">
+        <span class="sw-text"><b>Object detection</b><span>Boxes, confidence, track IDs</span></span><kbd aria-hidden="true">B</kbd><i aria-hidden="true"></i>
+      </button>
+      <p class="sn-title">Robot camera <kbd aria-hidden="true">Z</kbd></p>
+      <div class="seg" role="radiogroup" aria-label="Robot camera window">
+        <button type="button" role="radio" aria-checked="true" data-feed="off">Off</button>
+        <button type="button" role="radio" aria-checked="false" data-feed="rgb">Color</button>
+        <button type="button" role="radio" aria-checked="false" data-feed="depth">Depth</button>
+      </div>
+    </div>
+
+    <div class="pip" id="pip" hidden>
+      <span class="pip-label" id="pip-label">Depth</span>
+      <span class="pip-scale" aria-hidden="true"><span>near</span><i></i><span>far</span></span>
+    </div>
+
+    <p class="toast" id="toast" aria-hidden="true"></p>
 
     <div class="ixcard" id="ixcard" role="group" aria-labelledby="ix-name" hidden>
       <div class="ix-head">
@@ -158,6 +194,10 @@
                 morph between the two, trading energy for time. A ghost rehearses the route first.
               </li>
               <li><b>F</b> folds the wheels into rotors and takes off; F again lands. <b>C</b> shows the local costmap.</li>
+              <li>
+                <b>V</b> rides along: a chase view, then the robot's own camera. <b>Sensors</b> turns on object detection,
+                a depth camera, and the LiDAR.
+              </li>
               <li><b>Scroll, or press Solve.</b> It visits every room in order: one room per chapter.</li>
               <li><b>Arrow keys or WASD</b> drive it by hand, on the ground or in the air.</li>
               <li>

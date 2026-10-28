@@ -24,7 +24,12 @@ before the robot sets off. Every room is a chapter of his career, and walking
 - **F**, or the Fly button: fold the wheels into rotors and take off; again to
   land (over a wall, it hops to the nearest floor first). Left alone in the
   air, it lands by itself after a while.
-- **C**, or the Costmap button: the local costmap around the robot.
+- **V**, or the View button: **Top** (the board), **Chase** (behind the
+  robot) or **First person** (its own camera, between the walls, or over
+  them when it flies). In Chase and First person, **W/S** drive and **A/D**
+  turn, relative to the robot; clicking the floor still plans a route.
+- **Sensors** panel: **L** LiDAR, **C** costmap, **B** object detection,
+  **Z** the robot camera's window (off, colour, depth).
 - **Point at an object**: a card says what it is, whether it's *active* (you
   ask the robot to do something with it) or *passive* (it reacts to the robot
   by itself), and what you can do. Click the object to do the main thing; on
@@ -116,6 +121,26 @@ before the robot sets off. Every room is a chapter of his career, and walking
   table, a docked trolley is pushed to the nearest spot and released, and the
   arm folds. Solve again and the planner starts from wherever the blocks are.
 
+## What the robot sees
+
+- **The camera** sits on M4's nose and tilts down a little more when it
+  flies. First person is that camera, banking and bobbing with the body; the
+  chase view trails the heading with a lag. Switching views blends position,
+  orientation, field of view and fog over half a second.
+- **Object detection** (`src/maze/sensors.ts`): every room reports its
+  detectable things with live boxes (blocks, the trolley, the pendulum, the
+  posters, the swarm robots, the drones, the project screens). At 10 Hz the
+  detector keeps those inside the camera's frustum and range, probes three
+  lines of sight past the walls, and scores a confidence from distance and
+  occlusion. Tracks keep their ID through short gaps. Boxes are drawn on a 2D
+  canvas over the scene, in whichever view you're in; from above you also see
+  the camera's field of view, cut off by the walls.
+- **The camera window** renders the scene a second time from the lens into a
+  small frame: in colour, or as depth (linear distance through a Turbo colour
+  map, with an override material that also handles the instanced meshes).
+- **Driving by hand** in the first-person views sets speed and turn rate
+  directly, and slides along walls and props instead of entering them.
+
 ## How it's built
 
 - **Page first.** `index.html` holds every word. The story panel, the list view
@@ -158,9 +183,10 @@ src/maze/arm.ts         the arm on M4's back and its closed-form IK
 src/maze/pddl.ts        a small PDDL parser, grounder and A* (h_max) planner; the blocks domain
 src/maze/blocks.ts      the blocks-world table
 src/maze/tasks.ts       active interactions: PDDL plans and docking compiled into motion steps
+src/maze/sensors.ts     object detector with tracks, the camera's view fan, the first-person HUD, depth shader
 src/maze/drive.ts       differential-drive kinematics + pure pursuit
 src/maze/mapf.ts        prioritized space-time A* for the swarm room
-src/maze/world.ts       renderer, camera, input, hover cards, planning, preview, tour, sleep
+src/maze/world.ts       renderer, views, sensors, input, hover cards, planning, preview, tour, sleep
 src/maze/floor.ts       floor shader, baked light, search texture, costmap window
 src/maze/walls.ts       the walls
 src/maze/robot.ts       the small robots in the swarm room

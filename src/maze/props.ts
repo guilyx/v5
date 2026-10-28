@@ -56,9 +56,19 @@ export interface Trolley {
   status(s: "idle" | "locked" | "docked"): void;
 }
 
+/** something the robot's camera can detect: a class, a label, and where it is right now */
+export interface Det {
+  key: string;
+  cls: string;
+  label: string;
+  box: THREE.Box3;
+}
+
 export interface Fx {
   room: number;
   group: THREE.Group;
+  /** report the detectable objects, with up-to-date boxes */
+  detect?(out: Det[]): void;
   ix?: Interactable[];
   table?: BlocksTable;
   trolley?: Trolley;
@@ -116,6 +126,18 @@ function glow(objs: THREE.Object3D[]) {
   return (on: boolean) => {
     for (const { m, base } of mats) m.uniforms.uEmissive.value = on ? Math.min(1, base + 0.3) : base;
   };
+}
+
+const detOf = (key: string, cls: string, label = cls): Det => ({ key, cls, label, box: new THREE.Box3() });
+/** boxes of an instanced mesh's instances, from its geometry's bounds */
+function instanceBoxes(mesh: THREE.InstancedMesh, dets: Det[], grow = 0) {
+  const geo = mesh.geometry;
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const m = new THREE.Matrix4();
+  dets.forEach((d, i) => {
+    mesh.getMatrixAt(i, m);
+    d.box.copy(geo.boundingBox!).applyMatrix4(m).expandByScalar(grow);
+  });
 }
 
 /** an invisible box that only the hover ray sees (the ray doesn't skip hidden meshes) */
@@ -562,9 +584,14 @@ function coimbra(ctx: Ctx, r: RoomDef): Fx {
     mini.root.rotation.y += d * 0.35;
   };
   place();
+  const mini0 = detOf("coimbra-robot", "robot");
   return {
     room: 3,
     group: g,
+    detect(out) {
+      out.push(mini0);
+      mini0.box.setFromObject(mini.root);
+    },
     update(now, dt) {
       if (ctx.reduced) return false;
       mini.puck.rotation.y = now * 9;
@@ -691,6 +718,7 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
     },
   ];
   const kit = new Kit();
+  const posterDets: Det[] = [];
   const pw = 4.3;
   const ph = 2.69;
   const lean = 0.56;
@@ -706,6 +734,10 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
     plane.position.set(x, yc + 0.045 * Math.sin(lean), zc + 0.045 * Math.cos(lean));
     plane.rotation.x = -lean;
     g.add(plane);
+    plane.updateMatrixWorld();
+    const d = detOf(`poster-${p.x}`, "poster");
+    d.box.setFromObject(plane);
+    posterDets.push(d);
     // the board and its easel
     const board = new THREE.BoxGeometry(pw + 0.14, ph + 0.14, 0.05);
     board.rotateX(-lean);
@@ -769,11 +801,18 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
       highlight: pendulumGlow,
     },
   ];
+  const blockDets = Object.keys(table.blocks).map((n) => detOf(`block-${n}`, "block", `block ${n.toUpperCase()}`));
+  const cartDet = detOf("pendulum", "pendulum");
   return {
     room: 4,
     group: g,
     ix,
     table,
+    detect(out) {
+      blockDets.forEach((d) => d.box.setFromObject(table.blocks[d.key.slice(6)]));
+      cartDet.box.setFromObject(cart);
+      out.push(...blockDets, cartDet, ...posterDets);
+    },
     update(now) {
       if (ctx.reduced) return false;
       const th = 0.16 * Math.sin(now * 2.3) + 0.05 * Math.sin(now * 5.1);
@@ -944,11 +983,16 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
   ];
 
   let k = 0;
+  const trolleyDet = detOf("trolley", "trolley");
   return {
     room: 5,
     group: g,
     ix,
     trolley,
+    detect(out) {
+      trolleyDet.box.setFromObject(body);
+      out.push(trolleyDet);
+    },
     update(now, dt, inside) {
       const target = inside || state !== "idle" ? 1 : 0;
       const prevK = k;
@@ -1138,10 +1182,15 @@ function tii(ctx: Ctx, r: RoomDef): Fx {
     },
   ];
 
+  const agentDets = colors.map((_, i) => detOf(`agent-${i}`, "robot"));
   return {
     room: 6,
     group: g,
     ix,
+    detect(out) {
+      instanceBoxes(agents, agentDets);
+      out.push(...agentDets);
+    },
     update(now, dt, inside) {
       if (ctx.reduced) {
         if (inside && round === 0) {
@@ -1292,15 +1341,19 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
     out[2] = cz + Math.sin(th) * rad * 0.82;
   };
   const around = (i: number, now: number, out: number[]) => {
-    // a loose flock around and a little behind the robot, at its height (or above it on the ground)
+    // an escort: a loose ring around a point just ahead of the robot, near its camera's height,
+    // so you see them from the robot's own view too
     const ph = (i / N) * Math.PI * 2 + now * 0.55;
     const lane = i % 3;
-    const rad = 0.95 + lane * 0.42;
-    const back = 0.35;
+    const rad = 0.95 + lane * 0.45;
+    // a ring squashed along the heading, so the nearest drone stays a body length ahead
+    const ahead = 2.2;
     const h = ctx.robot.heading;
-    out[0] = ctx.robot.x - Math.cos(h) * back + Math.cos(ph) * rad;
-    out[1] = (ctx.robot.flying ? ctx.robot.alt : 0.9) + 0.3 + lane * 0.22 + 0.12 * Math.sin(now * 1.3 + i);
-    out[2] = ctx.robot.z - Math.sin(h) * back + Math.sin(ph) * rad;
+    const f = ahead + Math.cos(ph) * rad * 0.55;
+    const l = Math.sin(ph) * rad;
+    out[0] = ctx.robot.x + Math.cos(h) * f - Math.sin(h) * l;
+    out[1] = (ctx.robot.flying ? ctx.robot.alt - 0.1 : 0.55) + lane * 0.26 + 0.12 * Math.sin(now * 1.3 + i);
+    out[2] = ctx.robot.z + Math.sin(h) * f + Math.cos(h) * l;
   };
   const a = [0, 0, 0];
   const b = [0, 0, 0];
@@ -1402,10 +1455,15 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
       highlight: glow([drones]),
     },
   ];
+  const droneDets = Array.from({ length: N }, (_, i) => detOf(`drone-${i}`, "drone"));
   return {
     room: 8,
     group: g,
     ix,
+    detect(out) {
+      instanceBoxes(drones, droneDets, 0.04);
+      out.push(...droneDets);
+    },
     update(now, dt, inside) {
       if (ctx.reduced) return false;
       lead += ((inside ? 1 : 0) - lead) * Math.min(1, dt * 1.6);
@@ -1517,10 +1575,18 @@ function projects(ctx: Ctx, r: RoomDef): Fx {
     },
   };
 
+  const screenDets = screens.map((sc, i) => {
+    const d = detOf(`screen-${i}`, "monitor");
+    d.box.set(new THREE.Vector3(sc.x - sw / 2, sc.y - sh / 2, sc.z - 0.15), new THREE.Vector3(sc.x + sw / 2, sc.y + sh / 2, sc.z + 0.15));
+    return d;
+  });
   return {
     room: 9,
     group: g,
     pick: [pick],
+    detect(out) {
+      out.push(...screenDets);
+    },
     approach() {
       if (loaded) return;
       loaded = true;
