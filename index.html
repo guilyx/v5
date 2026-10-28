@@ -362,35 +362,46 @@
         </div>
       </article>
 
-      <!-- 06 · TII -->
-      <article id="room-tii" class="room" data-room="6" style="--band: #f6d3c6; --band-ink: #9a3f22">
+      <!-- 06 · TII · Command & Control -->
+      <article id="room-tii-c2" class="room" data-room="6" style="--band: #2b3138; --band-ink: #ffb49c; --band-head: #fffaf1">
         <header class="room-head">
           <p class="kicker"><span class="no">06</span> Abu Dhabi, UAE · 2022–2026</p>
-          <h2>From one robot to a swarm</h2>
-          <p class="role">Technology Innovation Institute (TII)</p>
+          <h2>Command and control for a robot fleet</h2>
+          <p class="role">Technology Innovation Institute (TII): Senior Engineer, then Team Lead, Robotics Software</p>
         </header>
         <div class="room-body">
-          <h3>Senior Engineer, Robotics Software · 2022–2024</h3>
           <p>
-            R&amp;D on multi-robot behaviour orchestration, collaboration and control. I designed new swarm behaviours,
-            including decentralized bird-inspired flocking, published at IEEE/RSJ IROS 2024. I ran the live demos for
-            partners, and the project led to USD 3M in contracts.
+            At TII I worked on how many robots work together: behaviour orchestration, collaboration and control, first
+            as a senior engineer and then leading the team. Four rooms for four parts of it, starting with C2: the
+            operator's one picture of the fleet, and the one place to task it.
           </p>
-          <h3>Team Lead, Robotics Software · 2024–2026</h3>
+          <p>I ran the live demos for partners; that work led to USD 3M in contracts.</p>
+          <section class="try maze-only" data-ix="c2" aria-labelledby="try-c2">
+            <div class="try-head">
+              <h3 id="try-c2">Try it: task the fleet</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              Four drones and two rovers. Survey sector B, escort M4, hold the perimeter, or bring them home. The table
+              and the video wall follow along; the third screen is the whole maze, with M4 on it. A unit low on battery
+              goes home on its own and says so.
+            </p>
+            <div class="try-actions"></div>
+          </section>
+        </div>
+      </article>
+
+      <!-- 07 · TII · Swarm control -->
+      <article id="room-tii-swarm" class="room" data-room="7" style="--band: #f6d3c6; --band-ink: #9a3f22">
+        <header class="room-head">
+          <p class="kicker"><span class="no">07</span> TII · Swarm control</p>
+          <h2>Swarms with no leader</h2>
+          <p class="role">Senior Engineer, Robotics Software · 2022–2024</p>
+        </header>
+        <div class="room-body">
           <p>
-            I grew and led a team of 9 engineers across autonomy (navigation, perception, orchestration), infrastructure
-            (DevOps, RobotOps) and platform integration, and overhauled the swarm autonomy architecture.
-          </p>
-          <ul class="stats">
-            <li><b>−74%</b> onboard CPU</li>
-            <li><b>−52%</b> network bandwidth</li>
-            <li><b>9</b> engineers</li>
-            <li><b>USD 10M+</b> in contracts</li>
-          </ul>
-          <p>
-            A joint program with Caltech on M4, their multi-modal robot that flies and rolls, and on their humanoid: I worked
-            on outdoor planning and tracking for M4. Demos to companies in Europe and the UAE led to more than USD 10M in
-            contracts. I also started building AI tooling for the team.
+            I designed new swarm behaviours, including decentralized bird-inspired flocking: each drone steers by
+            acceleration from what its neighbours do, with no leader and no plan. It was published at IEEE/RSJ IROS 2024.
           </p>
           <ul class="papers">
             <li>
@@ -400,25 +411,94 @@
               <span>IEEE/RSJ IROS 2024</span>
             </li>
           </ul>
-          <p class="aside">
-            The little robots around you are planning together: each one reserves its cells in space and time, so nobody
-            collides. A small nod to PyMAPF. The robot you're driving is a toy M4: press F and its wheels fold into rotors.
-          </p>
-          <section class="try maze-only" data-ix="mapf" aria-labelledby="try-mapf">
+          <p>Later, leading the team, I overhauled the swarm autonomy architecture:</p>
+          <ul class="stats">
+            <li><b>−74%</b> onboard CPU</li>
+            <li><b>−52%</b> network bandwidth</li>
+          </ul>
+          <section class="try maze-only" data-ix="flocking" aria-labelledby="try-flocking">
             <div class="try-head">
-              <h3 id="try-mapf">Try it: drive into the swarm</h3>
+              <h3 id="try-flocking">Try it: break the rules</h3>
               <span class="chip chip-passive">Passive</span>
             </div>
-            <p>Nothing to press: drive in and the six robots replan around you, then gather in a ring.</p>
+            <p>
+              Each drone listens to its seven nearest neighbours, as starlings do, and they're coloured by heading: one
+              colour means they agree. Turn separation, alignment or cohesion off and watch the flock fall apart. Make M4
+              a predator and drive into them, or show one drone's view.
+            </p>
             <div class="try-actions"></div>
           </section>
         </div>
       </article>
 
-      <!-- 07 · Unchained Labs -->
-      <article id="room-unchained" class="room" data-room="7" style="--band: #d6e6f5; --band-ink: #2c5687">
+      <!-- 08 · TII · Orchestration -->
+      <article id="room-tii-bt" class="room" data-room="8" style="--band: #efe0cf; --band-ink: #8a4a2b">
         <header class="room-head">
-          <p class="kicker"><span class="no">07</span> Remote · 2024–now</p>
+          <p class="kicker"><span class="no">08</span> TII · Orchestration</p>
+          <h2>Behavior trees for a team of robots</h2>
+          <p class="role">Team Lead, Robotics Software · 2024–2026</p>
+        </header>
+        <div class="room-body">
+          <p>
+            I grew and led a team of 9 engineers across autonomy (navigation, perception, orchestration), infrastructure
+            (DevOps, RobotOps) and platform integration. Orchestration is how a team of robots shares work: each one runs a
+            behavior tree, and an orchestrator hands tasks out and takes them back.
+          </p>
+          <ul class="stats">
+            <li><b>9</b> engineers</li>
+            <li><b>3</b> layers: autonomy, infrastructure, integration</li>
+          </ul>
+          <section class="try maze-only" data-ix="bt" aria-labelledby="try-bt">
+            <div class="try-head">
+              <h3 id="try-bt">Try it: give them trouble</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              Each robot runs the tree on the wall, five ticks a second: recharge if the battery's low, else do its task,
+              else patrol. Raise an anomaly and the orchestrator sends the nearest free robot. Drain a battery mid-task and
+              it hands the task back. Block the middle and they replan.
+            </p>
+            <div class="try-actions"></div>
+          </section>
+        </div>
+      </article>
+
+      <!-- 09 · TII × Caltech · Plan & track -->
+      <article id="room-tii-track" class="room" data-room="9" style="--band: #e6dcc0; --band-ink: #6b5320">
+        <header class="room-head">
+          <p class="kicker"><span class="no">09</span> TII × Caltech · M4</p>
+          <h2>M4, outdoors</h2>
+          <p class="role">Joint program with Caltech: M4 and the humanoid</p>
+        </header>
+        <div class="room-body">
+          <p>
+            A joint program with Caltech on M4, their multi-modal robot that flies and rolls, and on their humanoid. I
+            worked on outdoor planning and tracking for M4: paths through costmaps, and controllers that keep to them.
+            Demos to companies in Europe and the UAE led to more than USD 10M in contracts. I also started building AI
+            tooling for the team.
+          </p>
+          <ul class="stats">
+            <li><b>USD 10M+</b> in contracts</li>
+          </ul>
+          <section class="try maze-only" data-ix="field" aria-labelledby="try-field">
+            <div class="try-head">
+              <h3 id="try-field">Try it: get in its way</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              A costmap of the rocks, A* through it, and a controller tracking the path: pure pursuit, Stanley, or a
+              sampling MPC. Drop a rock in its way and it replans; add wind and watch the cross-track error on the wall.
+            </p>
+            <div class="try-actions"></div>
+          </section>
+          <p class="aside">The robot you're driving is a toy M4: press F and its wheels fold into rotors.</p>
+        </div>
+      </article>
+
+      <!-- 10 · Unchained Labs -->
+      <article id="room-unchained" class="room" data-room="10" style="--band: #d6e6f5; --band-ink: #2c5687">
+        <header class="room-head">
+          <p class="kicker"><span class="no">10</span> Remote · 2024–now</p>
           <h2>Agents on your own machines</h2>
           <p class="role">Founder of Unchained Labs</p>
         </header>
@@ -444,10 +524,10 @@
         </div>
       </article>
 
-      <!-- 08 · SIRB.AI -->
-      <article id="room-sirb" class="room" data-room="8" style="--band: #f2e2b8; --band-ink: #6f5310">
+      <!-- 11 · SIRB.AI -->
+      <article id="room-sirb" class="room" data-room="11" style="--band: #f2e2b8; --band-ink: #6f5310">
         <header class="room-head">
-          <p class="kicker"><span class="no">08</span> Abu Dhabi, UAE · Feb 2026–now</p>
+          <p class="kicker"><span class="no">11</span> Abu Dhabi, UAE · Feb 2026–now</p>
           <h2>Head of Robotics</h2>
           <p class="role">SIRB.AI, founding team</p>
         </header>
@@ -479,15 +559,19 @@
               <b>Jam</b> part of it and the cut-off drones fly back to the group. <b>Fail</b> the best-connected drone and the
               formation closes up. <b>Short range</b> and it tightens so neighbours stay in reach.
             </p>
+            <p>
+              On the wall is the self-healing agent: what it noticed, what it thinks caused it, what it did, and how long the
+              swarm took to recover, with a mission-readiness score that says go or hold.
+            </p>
             <div class="try-actions"></div>
           </section>
         </div>
       </article>
 
-      <!-- 09 · Projects -->
-      <article id="room-projects" class="room" data-room="9" style="--band: #e4dcf0; --band-ink: #55407f">
+      <!-- 12 · Projects -->
+      <article id="room-projects" class="room" data-room="12" style="--band: #e4dcf0; --band-ink: #55407f">
         <header class="room-head">
-          <p class="kicker"><span class="no">09</span> Projects</p>
+          <p class="kicker"><span class="no">12</span> Projects</p>
           <h2>Things I've built</h2>
           <p class="role">Every clip is a recording of the real thing running.</p>
         </header>
@@ -574,10 +658,10 @@
         </div>
       </article>
 
-      <!-- 10 · Photos -->
-      <article id="room-photos" class="room" data-room="10" style="--band: #f6dbe0; --band-ink: #93364c">
+      <!-- 13 · Photos -->
+      <article id="room-photos" class="room" data-room="13" style="--band: #f6dbe0; --band-ink: #93364c">
         <header class="room-head">
-          <p class="kicker"><span class="no">10</span> Off the clock</p>
+          <p class="kicker"><span class="no">13</span> Off the clock</p>
           <h2>Basketball, films, photographs</h2>
           <p class="role">And Clanker Labs: my self-hosted home, with an agent running it.</p>
         </header>
@@ -636,10 +720,10 @@
         </div>
       </article>
 
-      <!-- 11 · Exit -->
-      <article id="room-exit" class="room" data-room="11" style="--band: #d4ead8; --band-ink: #2c6a45">
+      <!-- 14 · Exit -->
+      <article id="room-exit" class="room" data-room="14" style="--band: #d4ead8; --band-ink: #2c6a45">
         <header class="room-head">
-          <p class="kicker"><span class="no">11</span> Exit</p>
+          <p class="kicker"><span class="no">14</span> Exit</p>
           <h2>You found the way out. Say hello.</h2>
         </header>
         <div class="room-body">
