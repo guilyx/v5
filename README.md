@@ -1,107 +1,98 @@
-# elejeune.me — v5
+# elejeune.me — v5 · The Maze
 
-The fifth iteration of my portfolio, and the first one you fly.
-
-The route is the [guilyx mark](https://github.com/guilyx/branding/blob/master/brand/logo.md)
-scaled up until a camera fits on it: three waypoints at the corners of a
-triangle, joined by an open path that enters at the apex and stops at the third
-node. Scrolling flies that path. Every chapter of the career sits on it as a
-3D scene, and the last shot climbs high enough to read the whole route as what
-it always was — the mark.
+A portfolio you solve.
 
 ![v5](public/og.jpg)
 
-## The flight
+Erwin won both maze-solving competitions in Coimbra and wrote a survey of
+multi-agent pathfinding, so his site is a maze. It is a tabletop toy: kraft
+walls, a paper floor, and a small differential-drive robot with a spinning
+LiDAR. Click anywhere and the robot plans a path with A* (the search washes
+over the cells in blue), then drives there. Every room is a chapter of his
+career, and walking into one opens its story.
 
-| Stop | What you see |
-| :--- | :--- |
-| launch | The apex waypoint, and the mark at monument scale, turning only in 120° steps |
-| metal · 2018 | A virtual STM32 with bus traffic on its traces, then a maze robot that floods, solves and drives |
-| research · 2020 | Multi-agent pathfinding (prioritized space-time A*, solved on load), a cart-pole with its jitter histogram, the papers — click to read |
-| field · 2021 | A supermarket: costmap, global plan, a lidar that raycasts the shelving, a tracked trolley, and a chase camera on the robot |
-| swarm · 2022 | The left waypoint. The companion flock does the job: murmuration, wedge formation behind a virtual leader, Voronoi coverage sweep, triangulation |
-| team · 2024 | −74% CPU and −52% bandwidth as bars that shrink, the team of nine, and Caltech's M4 folding its wheels into rotors |
-| company · 2024 | Unchained Labs: a spoken intent through the Kymatics agent graph into a queue of build jobs, all inside the client's box |
-| now · 2026 | SIRB.AI: a self-healing ring, a 16-node behavior tree densified into its six actions, faults on one timeline |
-| agentic era | Six gates you fly through — draft, AI review, checks, quiz, human review, ship |
-| builds | The real promo clips on screens hung at the altitude each project runs at |
-| open source | The archive as a constellation, placed by year, upstream projects as the bright stars |
-| lens | Every photo from v4, by trip — click for the full print |
-| open channel | The right waypoint, then the pull-back that reveals the route as the mark |
+## How you move through it
 
-The flock that follows you is a real boids simulation — separation,
-alignment, cohesion, and a goal force each scene sets. It's drawn in the
-brand's `agent` grey: texture, not decoration. Your pointer is a hawk.
+- **Click or tap the floor**: A* from the robot to that cell, the frontier
+  drawn as it expands, the route as a dotted line, then a pure-pursuit drive.
+- **Scroll** (or swipe up, or press Page Down): the next room, in order. One
+  gesture is one room, and the robot starts moving on the first wheel tick.
+  Scroll past the end of a story to keep going.
+- **Solve**: an autopilot tour of every room, with a pause in each.
+- **Arrow keys / WASD**: drive cell by cell.
+- **Map**: click a room (or any corridor) to go there.
+- **List view**: the whole site as a plain, readable document. Without WebGL
+  this is what you get.
+- Links like `/#room-coimbra` start the robot in that room.
 
-## Stack
+## The rooms
 
-- **[three.js](https://threejs.org)** — no framework on top; every scene is a function returning a group, its camera keys and an `update`
-- **TypeScript + [Vite](https://vite.dev)**
-- **No animation library.** Scroll maps to a position along two centripetal Catmull-Rom splines (camera and look target), and the camera chases it with exponential damping
+| | Room | What's in it |
+| -- | -- | -- |
+| 00 | Entrance | His name painted on the floor, the brand mark, a charging dock |
+| 01 | Nantes | A resistor, a capacitor and a breadboard |
+| 02 | Hiventive | The room is the chip: graphite package, gold pins, an STM32 die with TIM, I2C, CAN, GPIO, USART |
+| 03 | Coimbra | A small maze on a table that a small robot keeps solving, and two trophies: mapped, unmapped |
+| 04 | Centrale Nantes | The two papers on easels, and an inverted pendulum balancing |
+| 05 | Coalescent | Supermarket aisles and a trolley that gets a detection box when you walk in |
+| 06 | TII | Six robots plan around you with prioritized space-time A* (a PyMAPF nod); −74% CPU and −52% bandwidth painted on the floor |
+| 07 | Unchained Labs | An intent → agents → jobs graph with pulses running along it |
+| 08 | SIRB.AI | A flock of drones; now and then one fails, drops, and recovers |
+| 09 | Projects | The eight project clips on screens; the one you stand at plays |
+| 10 | Off the clock | His photos, printed and scattered on the floor (click one) |
+| 11 | Exit | A finish line, a mailbox, and how to reach him |
+
+## How it's built
+
+- **Page first.** `index.html` holds every word. The story panel, the list view
+  and the no-WebGL fallback are the same HTML; CSS decides how it's laid out.
+  The page's own JS is 7 KB gzipped and draws the minimap without three.js.
+- **3D second.** three.js loads with a dynamic `import()` once the fonts are in.
+- **The maze** (`src/maze/layout.ts`) is a seeded recursive backtracker over the
+  corridor lattice, with rooms carved first, doors opened per side, and some
+  dead ends braided into loops. Same seed, same maze, every visit.
+- **Walls** are merged into straight runs: 163 boxes in one `InstancedMesh`.
+  Soft clay edges and the dark foot of each wall come from the shader.
+- **Light** is baked: ambient occlusion and the sun's shadow are computed once
+  into a 228×172 texture. No shadow maps, no post-processing.
+- **The search** is a float texture with one texel per cell holding the time
+  A* closed it; the floor shader turns that into the fading wash. One upload
+  per plan, nothing per frame.
+- **Everything painted on the floor** (room names, the chip die, the
+  breadboard, the stats) shares one canvas atlas and one draw call.
+- **It sleeps.** After 16 s without input the robot dozes off, the LiDAR
+  winds down and rendering stops. The tab being hidden also stops it.
+- `prefers-reduced-motion`: the robot jumps to its goal, the camera cuts, and
+  nothing animates on its own.
+
+Run with `?perf` to see the per-frame cost.
 
 ## Structure
 
 ```
-src/
-├── content.ts            ← ALL the words and numbers (ported from v4's site.ts and the résumé)
-├── main.ts               ← boot, loader, frame loop, clicks
-├── core/
-│   ├── world.ts          ← the route (the mark), ground, waypoints, dust, stars
-│   ├── journey.ts        ← scroll → key index → camera
-│   ├── flock.ts          ← the companion boids
-│   ├── labels.ts         ← HTML labels pinned to points in 3D
-│   ├── engine.ts         ← renderer, bloom, grade, adaptive pixel ratio
-│   └── util.ts           ← Ink & Iris palette, shared materials
-├── scenes/               ← one file per chapter
-└── ui/
-    ├── sections.ts       ← the readable panels, one per stop, in document order
-    ├── hud.ts            ← waypoint rail, telemetry, panel crossfades
-    └── lightbox.ts
-public/
-├── media/                ← promo clips + posters (from v4)
-└── photos/               ← full-size prints, and sm/ for textures
+index.html              all the content (12 rooms)
+src/main.ts             story panel, map, scroll/keys/swipe, list view, photo viewer, lazy-loads the world
+src/styles.css          the design system: table, paper, kraft, one red, one blue
+src/media.ts            the project clips and photos used by the 3D rooms
+src/maze/layout.ts      the seeded grid and the rooms (no three.js)
+src/maze/astar.ts       A*, line-of-sight smoothing, clearance checks
+src/maze/drive.ts       differential-drive kinematics + pure pursuit
+src/maze/mapf.ts        prioritized space-time A* for the swarm room
+src/maze/world.ts       renderer, camera, input, tour, sleep
+src/maze/floor.ts       floor shader, baked light, search texture
+src/maze/walls.ts       the walls
+src/maze/robot.ts       the robot
+src/maze/fx.ts          dotted route, tyre tracks, LiDAR returns
+src/maze/props.ts       the rooms' props and floor paint
+public/work/            project clips (960px, 30 s loops) and posters
+public/photos/          twelve photos at 800 and 1600px
 ```
 
 ## Commands
 
-| Command             | Action                               |
-| :------------------ | :----------------------------------- |
-| `npm install`       | Install dependencies                 |
-| `npm run dev`       | Dev server at `localhost:5173`       |
-| `npm run build`     | Typecheck, then build to `./dist/`   |
-| `npm run preview`   | Preview the build                    |
-
-## Editing
-
-**Words** live in `src/content.ts`. Scenes read their numbers from there too
-(the rework percentages, the archive, the photo list), so changing a fact
-changes the drawing.
-
-**A new chapter** is a file in `src/scenes/` that returns a `Scene`: a group
-placed on the route with `env.world.frame(leg, f)`, one or more stops (each a
-DOM id, a scroll length in `vh`, and camera keys in the scene's local frame,
-where −Z is the direction of travel), and an `update`. Add a panel for each
-stop in `src/ui/sections.ts` and the factory to the list in `src/main.ts`.
-
-**Photos**: drop the full-size image in `public/photos/`, a ~640px copy in
-`public/photos/sm/`, and add it to a trip in `content.ts`.
-
-## Accessibility and fallbacks
-
-- Every panel is real HTML in reading order; the canvas is `aria-hidden`.
-- `prefers-reduced-motion` drops the camera inertia and slows everything that moves on its own.
-- No WebGL: the page becomes a plain, readable document.
-- The pixel ratio steps down if frames run long, so a weaker GPU gets a softer image instead of a stutter.
-
-## Deploying
-
-Static output — `npm run build`, serve `dist/`. On Vercel it's zero-config.
-Update the domain in `index.html` (`og:url`, `og:image`) and `src/content.ts`
-if it changes.
-
-## Credits
-
-Colour, mark and voice: [guilyx/branding](https://github.com/guilyx/branding).
-Content, clips and photos: [guilyx/v4](https://github.com/guilyx/v4). The
-layout lineage of v4 owes a debt to [Brittany Chiang's v4](https://v4.brittanychiang.com/);
-the panels here inherit some of that restraint.
+| Command           | Action                             |
+| :---------------- | :--------------------------------- |
+| `npm install`     | Install dependencies               |
+| `npm run dev`     | Dev server at `localhost:5173`     |
+| `npm run build`   | Typecheck, then build to `./dist/` |
+| `npm run preview` | Preview the build                  |
