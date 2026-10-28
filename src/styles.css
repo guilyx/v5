@@ -1468,6 +1468,24 @@ html:not(.maze-ready) .try {
 .pddl-src {
   margin-top: 8px;
 }
+/* a protocol's latest message, live */
+.try-live-wrap {
+  margin: 10px 0 0;
+}
+.try-live-wrap figcaption {
+  font: 600 13px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--search-ink);
+}
+.try-live {
+  margin: 4px 0 0;
+  padding: 10px 12px;
+  max-height: 240px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--paper);
+  font: 500 12px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre;
+}
 .pddl-src summary {
   cursor: pointer;
   font: 600 14px/1.6 ui-monospace, "SF Mono", Menlo, monospace;

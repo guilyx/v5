@@ -1,4 +1,4 @@
-import { FLOOR, H, type Maze, W, idx } from "./layout";
+import { FLOOR, H, type Maze, W, WALL, facade, idx } from "./layout";
 
 /**
  * Multi-modal A* for a robot that can roll and fly, like M4.
@@ -83,8 +83,9 @@ const state = new Uint8Array(N);
 const heap = new Int32Array(N * 9);
 
 export const canRoll = (m: Maze, x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && m.grid[idx(x, y)] === FLOOR;
-/** anywhere inside the frame: flying clears the walls and the props */
-export const canFly = (_m: Maze, x: number, y: number) => x > 0 && y > 0 && x < W - 1 && y < H - 1;
+/** anywhere inside the frame: flying clears the walls and the props, but not the building's outer wall */
+export const canFly = (m: Maze, x: number, y: number) =>
+  x > 0 && y > 0 && x < W - 1 && y < H - 1 && !(m.grid[idx(x, y)] === WALL && facade(x, y));
 
 /**
  * @param cost rolling cost per cell from the costmap, 0..1 (inflation near walls)

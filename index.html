@@ -238,9 +238,31 @@
         </header>
         <div class="room-body">
           <p>
-            I built a SystemC/TLM virtual prototype of an STM32 microcontroller, with its TIM, I2C, CAN, GPIO and USART
-            peripherals, and integrated it with QEMU. This room is the chip.
+            I built a SystemC/TLM virtual prototype of an STM32 microcontroller: its GPIO, SPI, I2C, USART, CAN and timer
+            peripherals, each modelled from the datasheet, integrated with QEMU. Then I ran a weather station's firmware on
+            it, sensors and buses included. This room is the chip, wired to that station.
           </p>
+          <section class="try maze-only" data-ix="station" aria-labelledby="try-station">
+            <div class="try-head">
+              <h3 id="try-station">Try it: a weather station on a simulated STM32</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <ul class="try-list">
+              <li>
+                <b>SPI.</b> The driver puts the BME280 in forced mode, burst-reads its eight data registers, and compensates
+                the raw counts with the datasheet's formulas.
+              </li>
+              <li><b>GPIO.</b> The anemometer and the rain gauge fire interrupts; B1 swaps °C and °F.</li>
+              <li>
+                <b>UART and CAN.</b> A line per sample to a terminal, a frame per sample to a dashboard node, CRC and bit
+                stuffing included. Unplug the node: no ACK, and the error counter climbs until the controller goes error
+                passive.
+              </li>
+            </ul>
+            <p>The logic analyser on the wall decodes whichever bus you probe.</p>
+            <div class="try-actions"></div>
+            <figure class="try-live-wrap"><figcaption>can0 and the serial port, live</figcaption><pre class="try-live"></pre></figure>
+          </section>
           <blockquote>Treat time, memory and bandwidth as a budget, and test against a model of the hardware first.</blockquote>
           <h3>Same year, same city</h3>
           <p>M.Sc. Computer Engineering &amp; Aeronautics at Ynov Bordeaux, 2018–2019.</p>
@@ -297,6 +319,20 @@
               <span>Preprint · 2021</span>
             </li>
           </ul>
+          <section class="try maze-only" data-ix="warehouse" aria-labelledby="try-warehouse">
+            <div class="try-head">
+              <h3 id="try-warehouse">Try it: a MAPF warehouse</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              Logistics robots fetch totes from the racks and drop them on the conveyor. Each time one finishes a job, all of
+              them are replanned together. Conflict-based search (CBS) finds the cheapest plan with no collisions; the red
+              rings are the collisions it found and planned around. Prioritized planning goes robot by robot: quicker, but
+              it can box one in.
+            </p>
+            <div class="try-actions"></div>
+            <figure class="try-live-wrap"><figcaption>the plan, live</figcaption><pre class="try-live"></pre></figure>
+          </section>
           <section class="try maze-only" data-ix="blocks" aria-labelledby="try-blocks">
             <div class="try-head">
               <h3 id="try-blocks">Try it: a PDDL planner on the arm</h3>
@@ -337,7 +373,25 @@
             When the CTO left, I took over navigation and trolley detection, recruited and trained interns and a junior
             engineer, ran planning, and turned the CEO's requirements into sprints.
           </p>
+          <p>
+            And a fleet manager that speaks VDA 5050, the open interface between a master control and its robots: it sends
+            orders as nodes and edges, and reads back each robot's state.
+          </p>
           <blockquote>A real store changes your priorities fast.</blockquote>
+          <section class="try maze-only" data-ix="fleet" aria-labelledby="try-fleet">
+            <div class="try-head">
+              <h3 id="try-fleet">Try it: the fleet in the backroom</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              Three AMRs slide under roll cages and carry them between the truck docks and the shop. The fleet manager only
+              releases the next couple of nodes of each order (the base; the rest is the horizon), and never one another
+              robot holds, so they never collide. Pause one and the others queue behind it; cancel an order or drain a
+              battery and watch the messages.
+            </p>
+            <div class="try-actions"></div>
+            <figure class="try-live-wrap"><figcaption>the latest order, as VDA 5050 JSON</figcaption><pre class="try-live"></pre></figure>
+          </section>
           <section class="try maze-only" data-ix="trolley" aria-labelledby="try-trolley">
             <div class="try-head">
               <h3 id="try-trolley">Try it: dock the trolley</h3>
@@ -363,7 +417,7 @@
       </article>
 
       <!-- 06 · TII · Command & Control -->
-      <article id="room-tii-c2" class="room" data-room="6" style="--band: #2b3138; --band-ink: #ffb49c; --band-head: #fffaf1">
+      <article id="room-tii-c2" class="room" data-room="6" style="--band: #e9cf9f; --band-ink: #8a3b1c">
         <header class="room-head">
           <p class="kicker"><span class="no">06</span> Abu Dhabi, UAE · 2022–2026</p>
           <h2>Command and control for a robot fleet</h2>
@@ -376,6 +430,10 @@
             operator's one picture of the fleet, and the one place to task it.
           </p>
           <p>I ran the live demos for partners; that work led to USD 3M in contracts.</p>
+          <p class="aside">
+            Through the glass doors, and out: from here on the rooms are outdoors, in the Abu Dhabi heat. The C2 post is a
+            command trailer in the sand, with a windsock for the drones.
+          </p>
           <section class="try maze-only" data-ix="c2" aria-labelledby="try-c2">
             <div class="try-head">
               <h3 id="try-c2">Try it: task the fleet</h3>
@@ -392,7 +450,7 @@
       </article>
 
       <!-- 07 · TII · Swarm control -->
-      <article id="room-tii-swarm" class="room" data-room="7" style="--band: #f6d3c6; --band-ink: #9a3f22">
+      <article id="room-tii-swarm" class="room" data-room="7" style="--band: #f0c98a; --band-ink: #9a3f22">
         <header class="room-head">
           <p class="kicker"><span class="no">07</span> TII · Swarm control</p>
           <h2>Swarms with no leader</h2>
@@ -432,7 +490,7 @@
       </article>
 
       <!-- 08 · TII · Orchestration -->
-      <article id="room-tii-bt" class="room" data-room="8" style="--band: #efe0cf; --band-ink: #8a4a2b">
+      <article id="room-tii-bt" class="room" data-room="8" style="--band: #dcd3bd; --band-ink: #8a4a2b">
         <header class="room-head">
           <p class="kicker"><span class="no">08</span> TII · Orchestration</p>
           <h2>Behavior trees for a team of robots</h2>
@@ -464,7 +522,7 @@
       </article>
 
       <!-- 09 · TII × Caltech · Plan & track -->
-      <article id="room-tii-track" class="room" data-room="9" style="--band: #e6dcc0; --band-ink: #6b5320">
+      <article id="room-tii-track" class="room" data-room="9" style="--band: #cfb895; --band-ink: #6b4320">
         <header class="room-head">
           <p class="kicker"><span class="no">09</span> TII × Caltech · M4</p>
           <h2>M4, outdoors</h2>
@@ -496,7 +554,7 @@
       </article>
 
       <!-- 10 · Unchained Labs -->
-      <article id="room-unchained" class="room" data-room="10" style="--band: #d6e6f5; --band-ink: #2c5687">
+      <article id="room-unchained" class="room" data-room="10" style="--band: #f3e7cf; --band-ink: #2c5687">
         <header class="room-head">
           <p class="kicker"><span class="no">10</span> Remote · 2024–now</p>
           <h2>Agents on your own machines</h2>
@@ -508,6 +566,7 @@
             agent orchestration: a spoken intent becomes a queue of build jobs.
           </p>
           <p class="links"><a href="https://unchainedlabs.dev/">unchainedlabs.dev</a><a href="https://github.com/Unchained-Labs">GitHub</a></p>
+          <p class="aside">Remote, from Abu Dhabi: in this room, a desk on the sand by the sea.</p>
           <h3>How I use AI in engineering</h3>
           <p>
             It lets a team ship more without lowering the bar. The real work is the harness around it: every change takes
@@ -525,7 +584,7 @@
       </article>
 
       <!-- 11 · SIRB.AI -->
-      <article id="room-sirb" class="room" data-room="11" style="--band: #f2e2b8; --band-ink: #6f5310">
+      <article id="room-sirb" class="room" data-room="11" style="--band: #dfdcbc; --band-ink: #6a4a10">
         <header class="room-head">
           <p class="kicker"><span class="no">11</span> Abu Dhabi, UAE · Feb 2026–now</p>
           <h2>Head of Robotics</h2>
@@ -543,7 +602,7 @@
           </p>
           <p class="aside">
             <span lang="ar">سرب</span> (sirb) is Arabic for a flock, or a swarm. Watch the drones over this room: now and
-            then one fails and drops, and the flock brings it back.
+            then one fails and drops, and the flock brings it back. The lagoon below has a flock of its own: flamingos.
           </p>
           <section class="try maze-only" data-ix="flock" aria-labelledby="try-flock">
             <div class="try-head">
@@ -569,7 +628,7 @@
       </article>
 
       <!-- 12 · Projects -->
-      <article id="room-projects" class="room" data-room="12" style="--band: #e4dcf0; --band-ink: #55407f">
+      <article id="room-projects" class="room" data-room="12" style="--band: #e4d0ad; --band-ink: #55407f">
         <header class="room-head">
           <p class="kicker"><span class="no">12</span> Projects</p>
           <h2>Things I've built</h2>
@@ -659,7 +718,7 @@
       </article>
 
       <!-- 13 · Photos -->
-      <article id="room-photos" class="room" data-room="13" style="--band: #f6dbe0; --band-ink: #93364c">
+      <article id="room-photos" class="room" data-room="13" style="--band: #f4e0d2; --band-ink: #93364c">
         <header class="room-head">
           <p class="kicker"><span class="no">13</span> Off the clock</p>
           <h2>Basketball, films, photographs</h2>
@@ -721,7 +780,7 @@
       </article>
 
       <!-- 14 · Exit -->
-      <article id="room-exit" class="room" data-room="14" style="--band: #d4ead8; --band-ink: #2c6a45">
+      <article id="room-exit" class="room" data-room="14" style="--band: #ecd19b; --band-ink: #2c6a45">
         <header class="room-head">
           <p class="kicker"><span class="no">14</span> Exit</p>
           <h2>You found the way out. Say hello.</h2>

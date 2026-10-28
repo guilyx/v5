@@ -52,7 +52,7 @@ export function pointClear(m: Maze, wx: number, wz: number, radius: number) {
       const v = m.grid[idx(x, z)];
       if (v === FLOOR) continue;
       // walls are drawn thin (the slab sits on the cell's centre line); props fill most of their cell
-      const half = v === 2 ? 0.44 : 0.17;
+      const half = v === 2 ? 0.44 : v === 3 ? 0.5 : 0.17;
       const ox = Math.max(Math.abs(gx - (x + 0.5)) - half, 0);
       const oz = Math.max(Math.abs(gz - (z + 0.5)) - half, 0);
       if (ox * ox + oz * oz < radius * radius) return false;

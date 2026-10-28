@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BLOCK, H, type Maze, ROOMS, W, WALL, idx } from "./layout";
+import { BLOCK, GROUND, H, type Maze, ROOMS, W, WALL, facade, idx } from "./layout";
 import { LIGHT, LIGHT_GLSL, PAL } from "./gfx";
 import { CM_SUB, type Costmaps } from "./costmap";
 
@@ -20,7 +20,8 @@ export function solidAt(m: Maze, gx: number, gz: number) {
     return ox < 0.42 && oz < 0.42 ? 0.5 : 0;
   }
   if (v !== WALL) return 0;
-  const h = cx === 0 || cz === 0 || cx === W - 1 || cz === H - 1 ? FRAME_H : WALL_H;
+  // the frame and the building's outer wall stand taller: nothing flies over them
+  const h = cx === 0 || cz === 0 || cx === W - 1 || cz === H - 1 || facade(cx, cz) ? FRAME_H : WALL_H;
   const ox = gx - cx - 0.5;
   const oz = gz - cz - 0.5;
   const t = WALL_T / 2;
@@ -136,6 +137,9 @@ uniform vec3 uSearchTile;
 uniform vec3 uInk;
 uniform vec4 uRoomRect[NROOMS];
 uniform vec3 uRoomTint[NROOMS];
+uniform float uRoomGround[NROOMS];
+uniform float uRoomSea[NROOMS];
+uniform vec3 uSand;
 uniform vec3 uHover;
 uniform vec4 uGoal;
 uniform vec3 uFlyCol;
@@ -147,6 +151,60 @@ varying vec3 vWorld;
 varying float vDepth;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float vnoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+// what the ground is like outdoors: wind ripples on sand, dunes, gravel, a lagoon, a beach, paving
+vec3 outdoorGround(vec3 base, float kind, vec2 p, vec4 rect, float seaAt) {
+  float n = vnoise(p * 0.9) * 0.6 + vnoise(p * 2.3) * 0.4;
+  // wind ripples, bent a little by the noise
+  float rip = sin((p.x * 0.55 + p.y * 1.0 + n * 1.6) * 9.0);
+  vec3 c = base * (0.97 + 0.05 * n);
+  if (kind < 1.5 || kind > 6.5) {
+    c *= 1.0 + 0.025 * rip;
+  } else if (kind < 2.5) {
+    // dunes: broad crests and troughs, with ripples on them
+    float d = sin(p.x * 0.7 + vnoise(p * 0.35) * 3.0) * 0.5 + 0.5;
+    c *= 0.9 + 0.16 * d + 0.03 * rip;
+  } else if (kind < 3.5) {
+    // gravel: stones of a few sizes, darker and lighter than the sand
+    vec2 q = p * 7.0;
+    float h = hash(floor(q));
+    float stone = step(0.62, h) * (1.0 - smoothstep(0.2, 0.42, length(fract(q) - 0.5)));
+    c *= 1.0 - 0.18 * stone * (h - 0.5) * 3.0 + 0.02 * rip;
+  } else if (kind < 4.5) {
+    // the lagoon: shallow water in the room's south-west corner, ragged, wet sand round it
+    vec2 rr = (p - rect.xy) / (rect.zw - rect.xy);
+    float edge = min(0.5 - rr.x, rr.y - 0.6) + (vnoise(p * 1.2 + 3.1) - 0.5) * 0.09;
+    float wet = smoothstep(-0.05, -0.01, edge);
+    float water = smoothstep(-0.01, 0.02, edge);
+    float sh = 0.5 + 0.5 * sin(p.x * 5.0 + p.y * 3.0 + uTime * 1.3 + n * 4.0);
+    vec3 sea = mix(vec3(0.42, 0.75, 0.74), vec3(0.62, 0.86, 0.82), sh * 0.6);
+    c = mix(c, c * 0.84, wet);
+    c = mix(c, sea, water * 0.92);
+  } else if (kind < 5.5) {
+    // a beach: the sea along the room's south side, foam where the waves reach
+    float yr = (p.y - rect.y) / (rect.w - rect.y);
+    float wave = seaAt + 0.025 * sin(p.x * 1.7 + uTime * 0.9) + 0.015 * sin(p.x * 4.1 - uTime * 1.4);
+    float sea = smoothstep(wave, wave + 0.02, yr);
+    float foam = 1.0 - smoothstep(0.0, 0.018, abs(yr - wave - 0.01));
+    float deep = smoothstep(wave + 0.04, 1.0, yr);
+    vec3 water = mix(vec3(0.5, 0.86, 0.84), vec3(0.18, 0.56, 0.7), deep);
+    c = mix(c, c * 0.88, smoothstep(wave - 0.06, wave, yr));
+    c = mix(c, water, sea);
+    c = mix(c, vec3(0.98, 0.98, 0.95), foam * 0.85);
+  } else {
+    // paving: square stones with sand in the joints
+    vec2 q = p * 2.0;
+    vec2 f = abs(fract(q) - 0.5);
+    float joint = smoothstep(0.43, 0.48, max(f.x, f.y));
+    c = mix(c * (0.96 + 0.06 * hash(floor(q))), base * 0.82, joint);
+  }
+  return c;
+}
 float box(vec2 p, vec2 b, float r) {
   vec2 q = abs(p) - b + r;
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
@@ -163,16 +221,33 @@ vec4 costColor(float c) {
 void main() {
   vec2 p = vWorld.xz;
   vec2 g = p + uSize * 0.5;
-  vec3 base = uBase;
+  // the building, then the outdoors (the same split as the layout's)
+  bool outside = outdoorAt(vWorld) > 0.5;
+  vec3 base = outside ? uSand : uBase;
+  float kind = outside ? 1.0 : 0.0;
+  vec4 rect = vec4(0.0);
+  float seaAt = 0.74;
   for (int i = 0; i < NROOMS; i++) {
     vec4 r = uRoomRect[i];
-    if (p.x > r.x && p.y > r.y && p.x < r.z && p.y < r.w) base = uRoomTint[i];
+    if (p.x > r.x && p.y > r.y && p.x < r.z && p.y < r.w) {
+      base = uRoomTint[i];
+      if (uRoomGround[i] > 0.5) kind = uRoomGround[i];
+      rect = r;
+      seaAt = uRoomSea[i];
+    }
   }
-  // paper grain, and a faint dot grid printed on the board like graph paper
-  base *= 0.985 + 0.03 * hash(floor(p * 24.0));
-  vec2 corner = abs(fract(g) - 0.5) - 0.5;
-  float dotGrid = 1.0 - smoothstep(0.028, 0.045, length(corner));
-  base = mix(base, uInk, dotGrid * 0.12);
+  if (kind > 0.5) {
+    base = outdoorGround(base, kind, p, rect, seaAt);
+    // the planner still needs to read the cells: a fainter grid outdoors
+    vec2 corner = abs(fract(g) - 0.5) - 0.5;
+    base = mix(base, uInk, (1.0 - smoothstep(0.028, 0.045, length(corner))) * 0.05);
+  } else {
+    // paper grain, and a faint dot grid printed on the board like graph paper
+    base *= 0.985 + 0.03 * hash(floor(p * 24.0));
+    vec2 corner = abs(fract(g) - 0.5) - 0.5;
+    float dotGrid = 1.0 - smoothstep(0.028, 0.045, length(corner));
+    base = mix(base, uInk, dotGrid * 0.12);
+  }
 
   // the planner's search: each cell lights up when A* closes it, then fades
   // rolling states in blue, flying states in orange
@@ -216,7 +291,7 @@ void main() {
   vec2 b = texture2D(uBake, g / uSize).rg;
   float ao = 1.0 - b.r * 0.62;
   float sun = 1.0 - b.g * 0.9;
-  vec3 col = shade(base, vec3(0.0, 1.0, 0.0), sun, ao);
+  vec3 col = shadeAt(base, vec3(0.0, 1.0, 0.0), sun, ao, outside ? 1.0 : 0.0);
   gl_FragColor = vec4(fogged(col, vDepth), 1.0);
   #include <colorspace_fragment>
 }
@@ -260,6 +335,9 @@ export function buildFloor(m: Maze, cm: Costmaps): Floor {
     uInk: { value: new THREE.Color(PAL.ink) },
     uRoomRect: { value: rects },
     uRoomTint: { value: tints },
+    uRoomGround: { value: ROOMS.map((r) => (r.ground ? GROUND[r.ground] : 0)) },
+    uRoomSea: { value: ROOMS.map((r) => r.sea ?? 0.74) },
+    uSand: { value: new THREE.Color(PAL.sand) },
     uHover: { value: new THREE.Vector3(0, 0, 0) },
     uGoal: { value: new THREE.Vector4(0, 0, 0, 0) },
     uFlyCol: { value: new THREE.Color(PAL.fly) },

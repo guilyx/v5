@@ -4,6 +4,7 @@ import { FLOOR, H, type Maze, ROOMS, W, cellToWorld, idx, worldToCell } from "./
 import { nearestFree, pointClear, smooth } from "./astar";
 import { buildFloor } from "./floor";
 import { buildWalls } from "./walls";
+import { Door, Dust, Sky } from "./sky";
 import { LIGHT, PAL, blobMaterial, clay } from "./gfx";
 import { LENS, LIDAR, TRACK, WHEEL_R, buildM4 } from "./m4";
 import { ALT, Motion, type Pose, Rehearsal, type Step } from "./motion";
@@ -86,6 +87,8 @@ export interface MazeApi {
   actions(id: string): IxAction[];
   run(id: string, action: string): void;
   anchor(id: string): { x: number; y: number } | null;
+  /** what an object is saying right now (a protocol's latest message), if anything */
+  live(id: string): string | null;
   setView(v: View): void;
   /** sensors: the LiDAR returns, the object detector, the camera window */
   sensor(name: "lidar" | "detect", on: boolean): void;
@@ -144,6 +147,13 @@ export function startMaze(
   );
   shadow.position.set(0.9, -0.69, 0.9);
   scene.add(shadow);
+  // the building around the first rooms and the sky over the rest, for the ride-along views
+  const sky = new Sky();
+  scene.add(sky.dome, sky.shell);
+  const door = new Door();
+  scene.add(door.group);
+  const dust = new Dust(opts.mobile ? 220 : 420);
+  if (!opts.reduced) scene.add(dust.points);
 
   /* ---------------------------------------------------------------- the robot: a toy M4 */
   const SCALE = 1.3;
@@ -530,14 +540,23 @@ export function startMaze(
       });
     const shown = hide.filter((o) => o.visible);
     for (const o of shown) o.visible = false;
+    // the robot's camera sees the ceiling or the sky, whatever the main view
+    const skyWas = [sky.dome.visible, sky.shell.visible];
+    const fogCol = LIGHT.uFogColor.value.clone();
+    sky.dome.visible = feedMode !== "depth";
+    sky.shell.visible = true;
+    sky.dome.position.copy(eyeCam.position);
+    const feedBg = Sky.outside(eyeCam.position.x, eyeCam.position.z) ? sky.hazeColor : sky.insideColor;
+    LIGHT.uFogColor.value.copy(feedBg);
     const fog = [LIGHT.uFogNear.value, LIGHT.uFogFar.value];
     LIGHT.uFogNear.value = 6.5;
     LIGHT.uFogFar.value = 21;
-    const bg = scene.background;
+    const bg = scene.background as THREE.Color;
+    const bgWas = bg.clone();
     if (feedMode === "depth") {
       scene.overrideMaterial = depthMat;
       scene.background = depthBg;
-    }
+    } else bg.copy(feedBg);
     renderer.setScissorTest(true);
     renderer.setViewport(x, height - y - h, w, h);
     renderer.setScissor(x, height - y - h, w, h);
@@ -545,9 +564,12 @@ export function startMaze(
     renderer.setScissorTest(false);
     renderer.setViewport(0, 0, width, height);
     scene.overrideMaterial = null;
-    scene.background = bg;
+    scene.background = bg.copy(bgWas);
     LIGHT.uFogNear.value = fog[0];
     LIGHT.uFogFar.value = fog[1];
+    LIGHT.uFogColor.value.copy(fogCol);
+    [sky.dome.visible, sky.shell.visible] = skyWas;
+    sky.dome.position.copy(camera.position);
     for (const o of shown) o.visible = true;
   }
 
@@ -1148,6 +1170,14 @@ export function startMaze(
     }
     placeCamera(dt);
     if (view === "chase" && chase.pos.distanceToSquared(tPos) > 1e-6) busy = true;
+    if (sky.prepare(scene, camera.position, view !== "top" || blend.t < 1, dt, reduced)) busy = true;
+    if (door.update(motion.x, motion.z, dt, reduced)) busy = true;
+    // blown sand, outdoors, while anything is moving; around the robot when riding along
+    if (!reduced && awake) {
+      const ride = view !== "top";
+      const px = (height * dpr) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+      dust.update(ride ? motion.x : look.x, ride ? motion.z : look.z, now, dt, ride ? px : px * 1.8);
+    }
 
     // rooms near the camera animate; heavy media loads as the robot approaches
     if (wasAwake && !awake) for (const f of rooms) f.sleep?.();
@@ -1269,6 +1299,7 @@ export function startMaze(
       wake();
     },
     actions: (id) => tasks.actions(id),
+    live: (id) => ixById.get(id)?.live?.() ?? null,
     run,
     anchor(id) {
       const i = ixById.get(id);

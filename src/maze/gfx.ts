@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { H, OUTDOOR, W } from "./layout";
 
 /** The toy's palette. Warm paper, kraft clay, one red for the robot, blue for rolling plans, orange for flying. */
 export const PAL = {
@@ -13,6 +14,11 @@ export const PAL = {
   accent: "#e4572e",
   search: "#3a6bf0",
   fly: "#e8850f",
+  // outdoors: the sand, the rammed-earth walls, and the building's plaster
+  sand: "#ecd3a2",
+  earth: "#c99a64",
+  earthFrame: "#b4834f",
+  plaster: "#f3ede2",
 };
 
 /** Lighting shared by every hand-written material: a sky/ground fill and one warm sun. */
@@ -29,11 +35,21 @@ export const LIGHT = {
 const LIGHT_GLSL = /* glsl */ `
 uniform vec3 uLightDir, uSky, uGround, uSun, uFogColor;
 uniform float uFogNear, uFogFar;
-vec3 shade(vec3 albedo, vec3 n, float sunVis, float ao) {
+// outdoors (TII on), the desert sun: harder light, a bluer sky above and sand bouncing up from below
+float outdoorAt(vec3 wp) {
+  vec2 c = floor(wp.xz + vec2(${W}.0, ${H}.0) * 0.5);
+  return (c.y >= ${OUTDOOR.south}.0 || (c.y >= ${OUTDOOR.west.y}.0 && c.x <= ${OUTDOOR.west.x}.0)) ? 1.0 : 0.0;
+}
+vec3 shadeAt(vec3 albedo, vec3 n, float sunVis, float ao, float outside) {
   float hemi = n.y * 0.5 + 0.5;
-  vec3 amb = mix(uGround, uSky, hemi) * 0.64 * ao;
+  vec3 sky = mix(uSky, vec3(0.86, 0.92, 1.0), outside * 0.55);
+  vec3 ground = mix(uGround, vec3(0.92, 0.78, 0.55), outside * 0.6);
+  vec3 amb = mix(ground, sky, hemi) * mix(0.64, 0.6, outside) * ao;
   float d = max(dot(n, uLightDir), 0.0);
-  return albedo * (amb + uSun * d * 0.5 * sunVis);
+  return albedo * (amb + uSun * d * mix(0.5, 0.7, outside) * sunVis);
+}
+vec3 shade(vec3 albedo, vec3 n, float sunVis, float ao) {
+  return shadeAt(albedo, n, sunVis, ao, 0.0);
 }
 vec3 fogged(vec3 c, float depth) {
   return mix(c, uFogColor, smoothstep(uFogNear, uFogFar, depth));
@@ -45,6 +61,7 @@ uniform vec3 uColor;
 varying vec3 vN;
 varying vec3 vCol;
 varying float vDepth;
+varying vec3 vWorld;
 #ifdef USE_MAP
 varying vec2 vUv;
 #endif
@@ -73,6 +90,7 @@ void main() {
   vLocal = position;
   vScale = vec3(length(m[0].xyz), length(m[1].xyz), length(m[2].xyz));
   #endif
+  vWorld = wp.xyz;
   vec4 mv = viewMatrix * wp;
   vDepth = -mv.z;
   gl_Position = projectionMatrix * mv;
@@ -86,6 +104,7 @@ uniform float uEmissive;
 varying vec3 vN;
 varying vec3 vCol;
 varying float vDepth;
+varying vec3 vWorld;
 #ifdef USE_MAP
 uniform sampler2D uMap;
 varying vec2 vUv;
@@ -117,7 +136,7 @@ void main() {
     albedo *= 1.0 + 0.07 * (1.0 - smoothstep(0.0, 0.03, top));
   }
   #endif
-  vec3 c = shade(albedo, n, 1.0, ao);
+  vec3 c = shadeAt(albedo, n, 1.0, ao, outdoorAt(vWorld));
   c = mix(c, albedo, uEmissive);
   gl_FragColor = vec4(fogged(c, vDepth), alpha);
   #include <colorspace_fragment>

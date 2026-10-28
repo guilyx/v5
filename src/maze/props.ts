@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { FLOOR, type Maze, ROOMS, type RoomDef, idx, rng, wallRuns } from "./layout";
+import { type Maze, ROOMS, type RoomDef, W, rng, wallRuns } from "./layout";
 import { Atlas, SANS, SERIF, fitText, quad, roundRect, spaced, spacedWidth, wrap } from "./paint";
 import { PAL, blobTexture, clay } from "./gfx";
 import { Kit, PX, cellAt, detOf, glow, gx, gz, hitBox, instanceBoxes, paintWord, wallScreen } from "./kit";
@@ -11,6 +11,10 @@ import { RANGE, SHORT, SwarmNet } from "./swarm";
 
 type Cell = [number, number];
 import { c2, orchestration, planTrack, swarmControl } from "./tii";
+import { hiventive } from "./hiventive";
+import { warehouse } from "./warehouse";
+import { backroom } from "./cmr";
+import { flamingoGeometry, lanterns, mangrove, palm, parasol, shrub } from "./outdoor";
 
 /**
  * The rooms. Each chapter gets a few props built from primitives, merged so a room costs one
@@ -43,6 +47,8 @@ export interface Interactable {
   /** things it does on its own, at your request (the swarm's faults) */
   actions?(): { id: string; label: string; primary?: boolean }[];
   run?(action: string): void;
+  /** what it's saying right now (a protocol's messages), for the story's "Try it" box */
+  live?(): string;
 }
 
 /**
@@ -277,111 +283,6 @@ function nantes(ctx: Ctx, r: RoomDef): Fx {
     },
   );
   return { room: 1, group: g };
-}
-
-/* ============================================================== 02 · Hiventive, the chip */
-
-function hiventive(ctx: Ctx, r: RoomDef): Fx {
-  const m = ctx.maze;
-  const kit = new Kit();
-  // gold pins on the outside of the package, wherever the wall is closed
-  const pinAt = (x: number, y: number, ox: number, oz: number) => {
-    if (m.grid[idx(x, y)] === FLOOR) return;
-    const cx = gx(x + 0.5) + ox * 0.31;
-    const cz = gz(y + 0.5) + oz * 0.31;
-    kit.box(ox ? 0.26 : 0.13, 0.08, ox ? 0.13 : 0.26, cx, 0.04, cz, PAL.gold);
-  };
-  for (let x = r.x; x < r.x + r.w; x++) {
-    pinAt(x, r.y - 1, 0, -1);
-    pinAt(x, r.y + r.h, 0, 1);
-  }
-  for (let y = r.y; y < r.y + r.h; y++) {
-    pinAt(r.x - 1, y, -1, 0);
-    pinAt(r.x + r.w, y, 1, 0);
-  }
-  const g = new THREE.Group();
-  g.add(kit.mesh({ emissive: 0.15 }));
-
-  // the die, painted on the package
-  const S = 600;
-  ctx.atlas.queue(
-    S,
-    S,
-    (k) => {
-      const gold = "#e9c97c";
-      k.fillStyle = "#43464e";
-      roundRect(k, 0, 0, S, S, 26);
-      k.fill();
-      // bond wires from the die to the edges
-      k.strokeStyle = gold;
-      k.globalAlpha = 0.55;
-      k.lineWidth = 3;
-      const inner = 150;
-      for (let i = 0; i < 9; i++) {
-        const t = inner + ((S - 2 * inner) * (i + 0.5)) / 9;
-        const o = (i + 0.5) * (S / 9);
-        k.beginPath();
-        k.moveTo(t, inner);
-        k.lineTo(o, 6);
-        k.moveTo(t, S - inner);
-        k.lineTo(o, S - 6);
-        k.moveTo(inner, t);
-        k.lineTo(6, o);
-        k.moveTo(S - inner, t);
-        k.lineTo(S - 6, o);
-        k.stroke();
-      }
-      k.globalAlpha = 1;
-      k.fillStyle = "#5c616b";
-      roundRect(k, inner, inner, S - 2 * inner, S - 2 * inner, 10);
-      k.fill();
-      k.strokeStyle = "rgba(233,201,124,0.35)";
-      k.lineWidth = 2;
-      for (let i = 1; i < 6; i++) {
-        const t = inner + ((S - 2 * inner) * i) / 6;
-        k.beginPath();
-        k.moveTo(t, inner + 8);
-        k.lineTo(t, S - inner - 8);
-        k.moveTo(inner + 8, t);
-        k.lineTo(S - inner - 8, t);
-        k.stroke();
-      }
-      k.fillStyle = "#43464e";
-      roundRect(k, S / 2 - 120, S / 2 - 70, 240, 140, 12);
-      k.fill();
-      k.fillStyle = gold;
-      k.textAlign = "center";
-      k.textBaseline = "middle";
-      k.font = `700 64px ${SANS}`;
-      k.fillText("STM32", S / 2, S / 2 - 14);
-      k.font = `600 24px ${SANS}`;
-      k.fillText("SystemC / TLM", S / 2, S / 2 + 38);
-      // the peripherals he modelled, on the die's edges
-      k.font = `700 28px ${SANS}`;
-      k.fillText("TIM", S / 2 - 90, inner - 26);
-      k.fillText("I2C", S / 2 + 90, inner - 26);
-      k.fillText("GPIO", S / 2, S - inner + 28);
-      k.save();
-      k.translate(inner - 28, S / 2);
-      k.rotate(-Math.PI / 2);
-      k.fillText("USART", 0, 0);
-      k.restore();
-      k.save();
-      k.translate(S - inner + 28, S / 2);
-      k.rotate(Math.PI / 2);
-      k.fillText("CAN", 0, 0);
-      k.restore();
-      // pin 1
-      k.beginPath();
-      k.arc(40, 40, 13, 0, Math.PI * 2);
-      k.fill();
-    },
-    (uv) => {
-      const [x, z] = cellAt(r, 4, 3.4);
-      ctx.decals.push(quad(x, 0.004, z, 6.2, 6.2, uv));
-    },
-  );
-  return { room: 2, group: g };
 }
 
 /* ============================================================== 03 · Coimbra, a maze in the maze */
@@ -667,7 +568,7 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
   }
 
   // an inverted pendulum that balances while you watch
-  const [px, pz] = cellAt(r, 9, 5);
+  const [px, pz] = cellAt(r, 9, 3);
   kit.box(1.25, 0.06, 0.2, px, 0.03, pz, "#3e3567");
   kit.box(0.05, 0.2, 0.2, px - 0.62, 0.1, pz, "#3e3567");
   kit.box(0.05, 0.2, 0.2, px + 0.62, 0.1, pz, "#3e3567");
@@ -691,8 +592,11 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
   g.add(cart);
 
   // the blocks world: a table, four blocks, and a PDDL plan for the arm to carry out
-  const [bx, bz] = cellAt(r, 5, 6);
+  const [bx, bz] = cellAt(r, 8, 7);
   const table = new BlocksTable(bx, bz, "#7d72c4", "#3e3567");
+  // the MAPF testbed, on its raised floor
+  const wh = warehouse(ctx, 4, gx(r.x), gz(r.y + 3));
+  g.add(wh.group);
   g.add(table.group);
   const tableGlow = glow(table.targets);
   const pendulumGlow = glow([cart]);
@@ -720,6 +624,7 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
       anchor: () => new THREE.Vector3(px, 1.45, pz),
       highlight: pendulumGlow,
     },
+    wh.ix,
   ];
   const blockDets = Object.keys(table.blocks).map((n) => detOf(`block-${n}`, "block", `block ${n.toUpperCase()}`));
   const cartDet = detOf("pendulum", "pendulum");
@@ -732,9 +637,12 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
       blockDets.forEach((d) => d.box.setFromObject(table.blocks[d.key.slice(6)]));
       cartDet.box.setFromObject(cart);
       out.push(...blockDets, cartDet, ...posterDets);
+      wh.detect(out);
     },
-    update(now) {
-      if (ctx.reduced) return false;
+    hud: () => wh.hud(),
+    update(now, dt) {
+      wh.update(now, dt);
+      if (ctx.reduced) return true;
       const th = 0.16 * Math.sin(now * 2.3) + 0.05 * Math.sin(now * 5.1);
       pole.rotation.z = -th;
       cart.position.x = px + 0.3 * Math.sin(now * 2.3 + 0.5);
@@ -898,6 +806,9 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
 
   // the checkout, painted on the floor where the trolley can be taken
   paintWord(ctx, "CHECKOUT", r.ink, ox, oz + 0.85, 26, 5);
+  // the backroom, and the fleet that works it
+  const br = backroom(ctx, r, 5);
+  g.add(br.group);
 
   let state: TrolleyState = "idle";
   const STATES: Record<TrolleyState, [string, string]> = {
@@ -959,6 +870,7 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
       anchor: () => new THREE.Vector3(tg.position.x, 1.45, tg.position.z),
       highlight: glow([body]),
     },
+    br.ix,
   ];
 
   let k = 0;
@@ -971,16 +883,19 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
     detect(out) {
       trolleyDet.box.setFromObject(body);
       out.push(trolleyDet);
+      br.detect(out);
     },
-    update(now, dt, inside) {
+    hud: () => br.hud(),
+    update(now, dt, inside, near) {
+      br.update(now, dt, near);
       const target = inside || state !== "idle" ? 1 : 0;
-      const prevK = k;
       k += (target - k) * Math.min(1, dt * (ctx.reduced ? 100 : 5));
       const flick = ctx.reduced || state !== "idle" ? 1 : 0.85 + 0.15 * Math.sin(now * 6);
       detMat.uniforms.uOpacity.value = k * flick;
       tagMat.uniforms.uOpacity.value = k;
       detMesh.visible = tag.visible = k > 0.01;
-      return Math.abs(k - prevK) > 0.001 || (inside && !ctx.reduced && state === "idle");
+      // the backroom's fleet never stops
+      return true;
     },
   };
 }
@@ -991,7 +906,7 @@ function unchained(ctx: Ctx, r: RoomDef): Fx {
   const g = new THREE.Group();
   // a little graph: intent -> three agents -> a queue of build jobs
   const node = (rx: number, ry: number) => cellAt(r, rx, ry);
-  const nodes = [node(0.7, 2), node(3, 0.8), node(3, 2), node(3, 3.2), node(5.4, 2)];
+  const nodes = [node(3.1, 3.2), node(5.4, 2), node(5.4, 3.2), node(5.4, 4.4), node(7.8, 3.2)];
   const edges: [number, number][] = [[0, 1], [0, 2], [0, 3], [1, 4], [2, 4], [3, 4]];
   const kit = new Kit();
   const ncol = ["#2c5687", "#4b8fd6", "#4b8fd6", "#4b8fd6", "#2c5687"];
@@ -1000,8 +915,25 @@ function unchained(ctx: Ctx, r: RoomDef): Fx {
     kit.cyl(0.24, 0.24, 0.02, x, 0.13, z, "#eaf2fb", 28);
   });
   // the queue: build jobs stacked by the last node
-  const [qx, qz] = node(5.4, 3.5);
+  const [qx, qz] = node(7.8, 4.7);
   for (let i = 0; i < 4; i++) kit.box(0.42, 0.14, 0.3, qx, 0.07 + i * 0.15, qz, i % 2 ? "#f1b33b" : "#f4ecd8");
+  // remote, from Abu Dhabi: a desk on the sand by the sea, under a parasol, between two palms
+  const [dx, dz] = cellAt(r, 1.5, 6);
+  kit.box(1.5, 0.05, 0.62, dx, 0.62, dz, "#c9a36a");
+  for (const sx of [-0.68, 0.68]) for (const sz of [-0.24, 0.24]) kit.box(0.04, 0.6, 0.04, dx + sx, 0.3, dz + sz, "#9a7552");
+  kit.box(0.5, 0.025, 0.34, dx - 0.2, 0.66, dz + 0.04, "#3c3e45");
+  const lid = new THREE.BoxGeometry(0.5, 0.32, 0.02);
+  lid.rotateX(0.25);
+  lid.translate(dx - 0.2, 0.83, dz - 0.14);
+  kit.add(lid, "#3c3e45");
+  kit.box(0.44, 0.26, 0.005, dx - 0.2, 0.83, dz - 0.125, "#4b8fd6");
+  kit.cyl(0.05, 0.04, 0.12, dx + 0.4, 0.7, dz, "#fffaf1", 10);
+  kit.box(0.42, 0.42, 0.04, dx + 0.1, 0.25, dz + 0.65, "#e4572e");
+  kit.box(0.42, 0.04, 0.42, dx + 0.1, 0.45, dz + 0.45, "#e4572e");
+  parasol(kit, ...cellAt(r, 3.3, 6.1), "#2c5687", 1.7);
+  palm(kit, ...cellAt(r, 0, 0), 2.4, 0.18, 0.4);
+  palm(kit, ...cellAt(r, 10, 0), 2.2, 0.14, 2.2);
+  shrub(kit, ...cellAt(r, 9.6, 6.6), 0.9);
   g.add(kit.mesh());
   ctx.atlas.queue(
     760,
@@ -1319,6 +1251,36 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
   const screen = wallScreen(5.4, 2.1, 1400, 544, 0.24);
   screen.stand(gx(r.x + 5.5), 0.15, gz(r.y) + 0.75);
   g.add(screen.group);
+  // سرب: a flock. The lagoon has its own, flamingos, and mangroves along its edge
+  const lagoon = new Kit();
+  mangrove(lagoon, ...cellAt(r, 0.1, 7.2), 1, 0.3);
+  mangrove(lagoon, ...cellAt(r, 4.3, 10.2), 0.9, 1.7);
+  mangrove(lagoon, ...cellAt(r, 0.2, 10.3), 0.8, 2.9);
+  g.add(lagoon.mesh());
+  const FL = 9;
+  const flamingos = new THREE.InstancedMesh(flamingoGeometry(), clay({ vertexColors: true }), FL);
+  const flRand = rng(2026);
+  const flock = Array.from({ length: FL }, () => ({
+    x: cellAt(r, 0.9 + flRand() * 3.3, 7.6 + flRand() * 2.6)[0],
+    z: cellAt(r, 0.9 + flRand() * 3.3, 7.6 + flRand() * 2.6)[1],
+    yaw: flRand() * Math.PI * 2,
+    ph: flRand() * 6,
+  }));
+  const flM = new THREE.Matrix4();
+  const flQ = new THREE.Quaternion();
+  const flS = new THREE.Vector3(1.15, 1.15, 1.15);
+  const flUp = new THREE.Vector3(0, 1, 0);
+  const placeFlamingos = (now: number) => {
+    flock.forEach((f, i) => {
+      flQ.setFromAxisAngle(flUp, f.yaw + 0.15 * Math.sin(now * 0.4 + f.ph));
+      flM.compose(new THREE.Vector3(f.x, -0.02 + 0.01 * Math.sin(now * 1.7 + f.ph), f.z), flQ, flS);
+      flamingos.setMatrixAt(i, flM);
+    });
+    flamingos.instanceMatrix.needsUpdate = true;
+  };
+  placeFlamingos(0);
+  g.add(flamingos);
+  const birdDets = flock.map((_, i) => detOf(`flamingo-${i}`, "bird", "flamingo"));
   const readiness = () =>
     THREE.MathUtils.clamp(0.45 * (net.count / N) + 0.35 * Math.min(1, net.lambda2 / 1.5) + 0.2 * (net.groups === 1 ? 1 : 0) - (net.jam ? 0.1 : 0), 0, 1);
   const drawConsole = () => {
@@ -1422,6 +1384,8 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
     detect(out) {
       instanceBoxes(drones, droneDets, 0.04);
       out.push(...droneDets);
+      instanceBoxes(flamingos, birdDets, 0.02);
+      out.push(...birdDets);
     },
     hud() {
       const lost = net.lost.reduce((s, v) => s + v, 0);
@@ -1436,6 +1400,7 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
       return { at: centroid().add(new THREE.Vector3(0, 1.1, 0)), title: "Swarm network", lines, color: ok ? "#2f8f5b" : "#e8850f" };
     },
     update(now, dt, inside, near) {
+      placeFlamingos(now);
       clock = now;
       if (ctx.reduced) {
         net.update(pos, now, dt);
@@ -1573,6 +1538,11 @@ function projects(ctx: Ctx, r: RoomDef): Fx {
   for (let i = 0; i < 4; i++) place(i, gx(r.x + 0.4 + 1.55 + i * 3.15), gz(r.y) + 0.62, 0.12, 0.38, false);
   for (let i = 0; i < 4; i++) place(i + 4, gx(r.x + 2 + i * 3), gz(r.y + 4.5) + 0.12, 0.3, 0.2, true);
   g.add(frames.mesh());
+  // an open-air courtyard: lanterns strung across, a palm in the corner
+  const court = new Kit();
+  for (const row of [2, 6]) lanterns(court, ...cellAt(r, 0, row), ...cellAt(r, 12, row), 11, 2.1);
+  palm(court, ...cellAt(r, 0, 8), 2.2, 0.12, 0.7);
+  g.add(court.mesh());
   const faceMesh = new THREE.Mesh(mergeGeometries(faces), clay({ map: tex, emissive: 0.55 }));
   g.add(faceMesh);
 
@@ -1728,6 +1698,11 @@ function photos(ctx: Ctx, r: RoomDef): Fx {
   const prints = new THREE.Mesh(mergeGeometries(geos), clay({ map: tex, emissive: 0.12 }));
   prints.renderOrder = 1;
   g.add(prints);
+  // the photos are laid out on the sand, by the sea
+  const beach = new Kit();
+  palm(beach, ...cellAt(r, 0, 8), 2.2, 0.2, 1.1);
+  parasol(beach, ...cellAt(r, 2, 8), "#93364c", 1.4);
+  g.add(beach.mesh());
   let loaded = false;
   return {
     room: 10,
@@ -1755,7 +1730,8 @@ function photos(ctx: Ctx, r: RoomDef): Fx {
 
 function exit(ctx: Ctx, r: RoomDef): Fx {
   const g = new THREE.Group();
-  // finish line across the way out
+  // the way out leaves through the frame on whichever side it's nearer: finish line, and an arrow to it
+  const west = r.x + r.w / 2 < W / 2;
   ctx.atlas.queue(
     96,
     192,
@@ -1767,18 +1743,21 @@ function exit(ctx: Ctx, r: RoomDef): Fx {
         }
     },
     (uv) => {
-      const gxw = gx(r.x + r.w + 0.5);
+      const gxw = gx(west ? r.x - 0.5 : r.x + r.w + 0.5);
       const gzw = gz(r.y + 4.5);
       ctx.decals.push(quad(gxw, 0.004, gzw, 0.5, 1.0, uv));
     },
   );
-  // an arrow painted toward it
   ctx.atlas.queue(
     260,
     120,
     (k) => {
       k.fillStyle = r.ink;
       k.globalAlpha = 0.7;
+      if (west) {
+        k.translate(260, 0);
+        k.scale(-1, 1);
+      }
       k.beginPath();
       k.moveTo(10, 44);
       k.lineTo(170, 44);
@@ -1791,10 +1770,15 @@ function exit(ctx: Ctx, r: RoomDef): Fx {
       k.fill();
     },
     (uv) => {
-      const [x, z] = cellAt(r, 2.6, 4);
+      const [x, z] = cellAt(r, west ? 1.4 : 2.6, 4);
       ctx.decals.push(quad(x, 0.004, z, 1.9, 0.88, uv));
     },
   );
+  const oasis = new Kit();
+  palm(oasis, ...cellAt(r, 0, 0), 2.3, 0.15, 0.2);
+  palm(oasis, ...cellAt(r, 0, 8), 2.1, 0.12, 1.9);
+  shrub(oasis, ...cellAt(r, 4.2, 7.0), 0.8);
+  g.add(oasis.mesh());
   // a mailbox, because the exit is where you write to him
   const [mx, mz] = cellAt(r, 3, 1);
   const kit = new Kit();
