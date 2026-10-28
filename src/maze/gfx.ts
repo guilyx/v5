@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-/** The toy's palette. Warm paper, kraft clay, one red for the robot, one blue for its thinking. */
+/** The toy's palette. Warm paper, kraft clay, one red for the robot, blue for rolling plans, orange for flying. */
 export const PAL = {
   table: "#e9e0d0",
   board: "#f8f3e9",
@@ -12,6 +12,7 @@ export const PAL = {
   robot: "#fffaf1",
   accent: "#e4572e",
   search: "#3a6bf0",
+  fly: "#e8850f",
 };
 
 /** Lighting shared by every hand-written material: a sky/ground fill and one warm sun. */

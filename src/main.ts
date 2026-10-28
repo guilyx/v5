@@ -1,6 +1,7 @@
 import "./styles.css";
 import { H, ROOMS, W, WALL, buildMaze, idx, wallRuns } from "./maze/layout";
-import type { MazeApi } from "./maze/world";
+import type { MazeApi, MotionState, PlanRow } from "./maze/world";
+import type { PlanKind } from "./maze/modal";
 
 /*
  * The page works on its own: every word is in index.html. This file adds the maze on top:
@@ -25,12 +26,18 @@ const grip = document.getElementById("sheet-grip") as HTMLButtonElement;
 const stat = document.getElementById("stat")!;
 const announce = document.getElementById("announce")!;
 const hint = document.getElementById("hint")!;
+const flyBtn = document.getElementById("fly-btn") as HTMLButtonElement;
+const costBtn = document.getElementById("cost-btn") as HTMLButtonElement;
+const dockMode = document.getElementById("dock-mode")!;
+const planNote = document.getElementById("plan-note")!;
+const planRows = Array.from(document.querySelectorAll<HTMLButtonElement>(".plan-row"));
+const pref = document.getElementById("pref") as HTMLInputElement;
 
 let api: MazeApi | null = null;
 let booting = false;
 let current = 0;
 let goal = -1;
-let robot = { x: 0, z: 0, h: 0 };
+let robot = { x: 0, z: 0, h: 0, fly: false };
 const visited = new Set<number>([0]);
 const isMaze = () => root.classList.contains("is-maze");
 
@@ -218,7 +225,8 @@ function drawMap() {
     }
     const x = robot.x + W / 2;
     const y = robot.z + H / 2;
-    mmCtx.fillStyle = "#e4572e";
+    const col = robot.fly ? "#e8850f" : "#e4572e";
+    mmCtx.fillStyle = col;
     mmCtx.beginPath();
     mmCtx.arc(x, y, 0.95, 0, Math.PI * 2);
     mmCtx.fill();
@@ -228,7 +236,7 @@ function drawMap() {
     mmCtx.beginPath();
     mmCtx.moveTo(x, y);
     mmCtx.lineTo(x + Math.cos(robot.h) * 1.6, y + Math.sin(robot.h) * 1.6);
-    mmCtx.strokeStyle = "#e4572e";
+    mmCtx.strokeStyle = col;
     mmCtx.lineWidth = 0.4;
     mmCtx.stroke();
   });
@@ -340,6 +348,17 @@ window.addEventListener("keydown", (e) => {
     }
     return;
   }
+  if (e.code === "KeyF" && !e.repeat) {
+    e.preventDefault();
+    api?.fly();
+    hideHint();
+    return;
+  }
+  if (e.code === "KeyC" && !e.repeat) {
+    e.preventDefault();
+    setCost(!costOn);
+    return;
+  }
   const onControl = !!t.closest("a, button");
   if (e.code === "PageDown" || (e.code === "Space" && !onControl && !inPanel) || e.code === "KeyN") {
     e.preventDefault();
@@ -435,6 +454,70 @@ cardVideos.forEach((v) => {
   card.addEventListener("pointerleave", () => isMaze() && v.pause());
 });
 
+/* ------------------------------------------------------------------ M4: planner table, fly and costmap */
+
+const KIND_LABEL: Record<PlanKind, string> = { hybrid: "Hybrid", roll: "Roll-only", fly: "Fly-only" };
+let kind: PlanKind = "hybrid";
+let costOn = true;
+
+function setKind(k: PlanKind) {
+  kind = k;
+  planRows.forEach((r) => r.setAttribute("aria-checked", String(r.dataset.kind === k)));
+  api?.setKind(k);
+}
+planRows.forEach((r) => r.addEventListener("click", () => setKind(r.dataset.kind as PlanKind)));
+// arrow keys move between the radio rows, as a radio group should
+planRows.forEach((r, i) =>
+  r.addEventListener("keydown", (e) => {
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    e.preventDefault();
+    e.stopPropagation();
+    const n = planRows[(i + (e.key === "ArrowDown" ? 1 : planRows.length - 1)) % planRows.length];
+    n.focus();
+    setKind(n.dataset.kind as PlanKind);
+  }),
+);
+pref.addEventListener("input", () => api?.setPref(Number(pref.value) / 100));
+
+function showRows(rows: Record<PlanKind, PlanRow | null>, chosen: PlanKind, preview: boolean) {
+  planNote.textContent = preview ? "Preview" : `Driving: ${KIND_LABEL[chosen]}`;
+  let best = Infinity;
+  for (const r of Object.values(rows)) if (r) best = Math.min(best, r.time);
+  for (const el of planRows) {
+    const r = rows[el.dataset.kind as PlanKind];
+    const f = (k: string) => el.querySelector<HTMLElement>(`[data-f="${k}"]`)!;
+    el.classList.toggle("is-none", !r);
+    el.classList.toggle("is-used", el.dataset.kind === chosen);
+    f("time").textContent = r ? `${r.time.toFixed(1)} s` : "no path";
+    f("energy").textContent = r ? String(Math.round(r.energy)) : "";
+    f("morphs").textContent = r ? String(r.morphs) : "";
+    f("time").classList.toggle("is-best", !!r && r.time === best);
+  }
+}
+
+const MODE_LABEL: Record<MotionState, string> = { roll: "Rolling", fly: "Flying", takeoff: "Taking off", landing: "Landing" };
+function showMode(m: MotionState) {
+  dockMode.dataset.state = m;
+  dockMode.querySelector(".dm-label")!.textContent = MODE_LABEL[m];
+  const air = m === "fly";
+  flyBtn.querySelector(".db-label")!.textContent = air || m === "takeoff" ? "Land" : "Fly";
+  flyBtn.setAttribute("aria-pressed", String(air));
+  flyBtn.disabled = m === "takeoff" || m === "landing";
+  if (isMaze()) announce.textContent = `${MODE_LABEL[m]}.`;
+}
+flyBtn.addEventListener("click", () => {
+  api?.fly();
+  hideHint();
+});
+function setCost(on: boolean) {
+  costOn = on;
+  costBtn.setAttribute("aria-pressed", String(on));
+  root.classList.toggle("costmap-on", on);
+  api?.costmap(on);
+}
+costBtn.addEventListener("click", () => setCost(!costOn));
+root.classList.add("costmap-on");
+
 /* ------------------------------------------------------------------ the maze */
 
 function insets() {
@@ -478,12 +561,14 @@ async function boot() {
       { reduced, insets, startRoom, mobile: mobileMq.matches || matchMedia("(pointer: coarse)").matches },
       {
         room: (i) => showRoom(i),
-        pose: (x, z, h) => {
-          robot = { x, z, h };
+        pose: (x, z, h, fly) => {
+          robot = { x, z, h, fly };
           drawMap();
         },
-        plan: ({ expanded, steps, room, preview }) => {
-          stat.textContent = `A* · ${expanded} cells searched · ${steps} steps`;
+        plans: ({ rows, chosen, preview }) => showRows(rows, chosen, preview),
+        mode: (m) => showMode(m),
+        plan: ({ expanded, room, preview, kind: k }) => {
+          stat.textContent = `${KIND_LABEL[k]} A* · ${expanded} states`;
           if (preview) return;
           goal = room;
           if (room >= 0) announce.textContent = `Driving to ${ROOMS[room].short}.`;
@@ -512,6 +597,9 @@ async function boot() {
     return;
   }
   root.classList.add("maze-ready");
+  api.setPref(Number(pref.value) / 100);
+  if (kind !== "hybrid") api.setKind(kind);
+  if (!costOn) api.costmap(false);
   if (!isMaze()) api.pause(true);
   hint.classList.add("show");
   hintTimer = window.setTimeout(hideHint, 9000);
