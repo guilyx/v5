@@ -6,6 +6,7 @@ import { PAL, blobTexture, clay, plain, tint } from "./gfx";
 import { buildRobot } from "./robot";
 import { type Cell, planAll } from "./mapf";
 import { PHOTOS, PROJECTS } from "../media";
+import { BlocksTable } from "./blocks";
 
 /**
  * The rooms. Each chapter gets a few props built from primitives, merged so a room costs one
@@ -17,14 +18,50 @@ export interface Ctx {
   atlas: Atlas;
   decals: THREE.BufferGeometry[];
   reduced: boolean;
-  robot: { x: number; z: number };
+  robot: { x: number; z: number; alt: number; heading: number; flying: boolean };
   kick: () => void;
   emit: (type: "photo" | "project", value: number | string | null) => void;
+}
+
+/** something in a room you can point at: a card shows what it is and what you can do with it */
+export interface Interactable {
+  id: string;
+  room: number;
+  name: string;
+  /** active: you ask the robot to do something with it; passive: it reacts to the robot on its own */
+  kind: "active" | "passive";
+  blurb: string;
+  /** what the hover ray tests */
+  targets: THREE.Object3D[];
+  /** where the card points, in world space */
+  anchor(): THREE.Vector3;
+  highlight(on: boolean): void;
+}
+
+/** the trolley in the supermarket: it can be docked to and pushed around */
+export interface Trolley {
+  group: THREE.Group;
+  /** trolley centres: where it starts, and the checkout */
+  home: [number, number];
+  checkout: [number, number];
+  /** grid cell under each spot */
+  homeCell: [number, number];
+  checkoutCell: [number, number];
+  at: "home" | "checkout";
+  docked: boolean;
+  setPose(x: number, z: number): void;
+  /** world position of the handle bar, for a trolley centred at x */
+  handle(x: number): THREE.Vector3;
+  /** the detection box: searching, locked while docking, docked */
+  status(s: "idle" | "locked" | "docked"): void;
 }
 
 export interface Fx {
   room: number;
   group: THREE.Group;
+  ix?: Interactable[];
+  table?: BlocksTable;
+  trolley?: Trolley;
   /** animate; return true while it still needs frames */
   update?(now: number, dt: number, inside: boolean): boolean;
   /** clickable meshes, with a handler */
@@ -66,6 +103,27 @@ class Kit {
     const m = new THREE.Mesh(mergeGeometries(this.parts), clay({ vertexColors: true, emissive: opts.emissive }));
     return m;
   }
+}
+
+/** brighten an object's clay materials while it's pointed at */
+function glow(objs: THREE.Object3D[]) {
+  const mats: { m: THREE.ShaderMaterial; base: number }[] = [];
+  for (const o of objs)
+    o.traverse((c) => {
+      const m = (c as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
+      if (m && m.uniforms?.uEmissive && !mats.some((x) => x.m === m)) mats.push({ m, base: m.uniforms.uEmissive.value });
+    });
+  return (on: boolean) => {
+    for (const { m, base } of mats) m.uniforms.uEmissive.value = on ? Math.min(1, base + 0.3) : base;
+  };
+}
+
+/** an invisible box that only the hover ray sees (the ray doesn't skip hidden meshes) */
+function hitBox(w: number, h: number, d: number, x: number, y: number, z: number) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());
+  m.position.set(x, y, z);
+  m.visible = false;
+  return m;
 }
 
 /* ============================================================== floor lettering for every room */
@@ -679,9 +737,43 @@ function centrale(ctx: Ctx, r: RoomDef): Fx {
   cart.position.set(px, 0, pz);
   cart.scale.setScalar(1.35);
   g.add(cart);
+
+  // the blocks world: a table, four blocks, and a PDDL plan for the arm to carry out
+  const [bx, bz] = cellAt(r, 5, 6);
+  const table = new BlocksTable(bx, bz, "#7d72c4", "#3e3567");
+  g.add(table.group);
+  const tableGlow = glow(table.targets);
+  const pendulumGlow = glow([cart]);
+  // the pole is too thin to point at: an invisible box around the bench catches the pointer
+  const pendulumHit = hitBox(1.5, 1.5, 0.7, px, 0.75, pz);
+  g.add(pendulumHit);
+  const ix: Interactable[] = [
+    {
+      id: "blocks",
+      room: 4,
+      name: "Blocks world",
+      kind: "active",
+      blurb: "A STRIPS problem on a table. The planner reads the PDDL, finds the shortest plan, and the arm carries it out.",
+      targets: table.targets,
+      anchor: () => new THREE.Vector3(bx, 1.05, bz),
+      highlight: tableGlow,
+    },
+    {
+      id: "pendulum",
+      room: 4,
+      name: "Inverted pendulum",
+      kind: "passive",
+      blurb: "Balancing on a cart: the test bench of the ROS 2 jitter paper. It keeps itself up.",
+      targets: [cart, pendulumHit],
+      anchor: () => new THREE.Vector3(px, 1.45, pz),
+      highlight: pendulumGlow,
+    },
+  ];
   return {
     room: 4,
     group: g,
+    ix,
+    table,
     update(now) {
       if (ctx.reduced) return false;
       const th = 0.16 * Math.sin(now * 2.3) + 0.05 * Math.sin(now * 5.1);
@@ -734,29 +826,36 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
   });
   g.add(prod);
 
-  // the trolley
+  // the trolley: built around its own origin so it can be docked to and pushed
   const [tx, tz] = cellAt(r, 6, 5);
+  const [ox, oz] = cellAt(r, 9, 5);
+  const tg = new THREE.Group();
+  tg.position.set(tx, 0, tz);
+  g.add(tg);
   const t = new Kit();
   const steel = "#9fb0bd";
   const L = 0.86;
   const D = 0.56;
   const yb = 0.42;
-  t.box(L, 0.025, D, tx, yb, tz, steel);
+  t.box(L, 0.025, D, 0, yb, 0, steel);
   for (const h of [0.12, 0.25, 0.38]) {
-    t.box(L, 0.022, 0.022, tx, yb + h, tz - D / 2, steel);
-    t.box(L, 0.022, 0.022, tx, yb + h, tz + D / 2, steel);
-    t.box(0.022, 0.022, D, tx - L / 2, yb + h, tz, steel);
-    t.box(0.022, 0.022, D, tx + L / 2, yb + h, tz, steel);
+    t.box(L, 0.022, 0.022, 0, yb + h, -D / 2, steel);
+    t.box(L, 0.022, 0.022, 0, yb + h, D / 2, steel);
+    t.box(0.022, 0.022, D, -L / 2, yb + h, 0, steel);
+    t.box(0.022, 0.022, D, L / 2, yb + h, 0, steel);
   }
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    t.box(0.025, 0.4, 0.025, tx + (sx * L) / 2, yb + 0.2, tz + (sz * D) / 2, steel);
-    t.box(0.03, yb, 0.03, tx + (sx * (L - 0.1)) / 2, yb / 2, tz + (sz * (D - 0.1)) / 2, steel);
-    t.cyl(0.05, 0.05, 0.035, tx + (sx * (L - 0.1)) / 2, 0.05, tz + (sz * (D - 0.1)) / 2, "#2f3336", 10, [Math.PI / 2, 0, 0]);
+    t.box(0.025, 0.4, 0.025, (sx * L) / 2, yb + 0.2, (sz * D) / 2, steel);
+    t.box(0.03, yb, 0.03, (sx * (L - 0.1)) / 2, yb / 2, (sz * (D - 0.1)) / 2, steel);
+    t.cyl(0.05, 0.05, 0.035, (sx * (L - 0.1)) / 2, 0.05, (sz * (D - 0.1)) / 2, "#2f3336", 10, [Math.PI / 2, 0, 0]);
   }
-  t.box(L - 0.1, 0.02, D - 0.08, tx, 0.13, tz, steel);
-  t.box(0.03, 0.03, D + 0.08, tx - L / 2 - 0.12, yb + 0.48, tz, "#2f7d4f");
-  for (const sz of [-1, 1]) t.box(0.16, 0.025, 0.025, tx - L / 2 - 0.06, yb + 0.44, tz + (sz * D) / 2, steel);
-  g.add(t.mesh());
+  t.box(L - 0.1, 0.02, D - 0.08, 0, 0.13, 0, steel);
+  const HANDLE_X = -L / 2 - 0.12;
+  const HANDLE_Y = yb + 0.48;
+  t.box(0.03, 0.03, D + 0.08, HANDLE_X, HANDLE_Y, 0, "#2f7d4f");
+  for (const sz of [-1, 1]) t.box(0.16, 0.025, 0.025, -L / 2 - 0.06, yb + 0.44, (sz * D) / 2, steel);
+  const body = t.mesh();
+  tg.add(body);
 
   // trolley detection: a box that locks on when the robot is in the room
   const det = new Kit();
@@ -764,52 +863,101 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
   const bh = 1.05;
   const bd = D + 0.24;
   const e = 0.022;
-  const cx = tx - 0.06;
+  const cx = -0.06;
   for (const y of [0, bh]) {
-    det.box(bw, e, e, cx, y + 0.01, tz - bd / 2, PAL.accent);
-    det.box(bw, e, e, cx, y + 0.01, tz + bd / 2, PAL.accent);
-    det.box(e, e, bd, cx - bw / 2, y + 0.01, tz, PAL.accent);
-    det.box(e, e, bd, cx + bw / 2, y + 0.01, tz, PAL.accent);
+    det.box(bw, e, e, cx, y + 0.01, -bd / 2, "#ffffff");
+    det.box(bw, e, e, cx, y + 0.01, bd / 2, "#ffffff");
+    det.box(e, e, bd, cx - bw / 2, y + 0.01, 0, "#ffffff");
+    det.box(e, e, bd, cx + bw / 2, y + 0.01, 0, "#ffffff");
   }
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) det.box(e, bh, e, cx + (sx * bw) / 2, bh / 2 + 0.01, tz + (sz * bd) / 2, PAL.accent);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) det.box(e, bh, e, cx + (sx * bw) / 2, bh / 2 + 0.01, (sz * bd) / 2, "#ffffff");
   const detMesh = det.mesh({ emissive: 0.6 });
   const detMat = detMesh.material as THREE.ShaderMaterial;
   detMat.transparent = true;
   detMat.depthWrite = false;
   detMat.uniforms.uOpacity.value = 0;
-  g.add(detMesh);
-  // its tag
+  detMat.uniforms.uColor.value.set(PAL.accent);
+  tg.add(detMesh);
+  // its tag, redrawn when the state changes
   const tagC = document.createElement("canvas");
-  tagC.width = 256;
+  tagC.width = 320;
   tagC.height = 64;
   const tk = tagC.getContext("2d")!;
-  tk.fillStyle = PAL.accent;
-  roundRect(tk, 0, 0, 256, 64, 12);
-  tk.fill();
-  tk.fillStyle = "#fff";
-  tk.font = `700 34px ${SANS}`;
-  tk.textBaseline = "middle";
-  spaced(tk, "TROLLEY", 26, 34, 4);
   const tagTex = new THREE.CanvasTexture(tagC);
   tagTex.colorSpace = THREE.SRGBColorSpace;
+  const drawTag = (text: string, color: string) => {
+    tk.clearRect(0, 0, 320, 64);
+    tk.fillStyle = color;
+    roundRect(tk, 0, 0, 320, 64, 12);
+    tk.fill();
+    tk.fillStyle = "#fff";
+    tk.font = `700 32px ${SANS}`;
+    tk.textBaseline = "middle";
+    spaced(tk, text, 22, 34, 3);
+    tagTex.needsUpdate = true;
+  };
+  drawTag("TROLLEY 0.97", PAL.accent);
   const tagMat = clay({ map: tagTex, emissive: 1, transparent: true, opacity: 0 });
-  const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.18), tagMat);
-  tag.position.set(cx - bw / 2 + 0.36, bh + 0.15, tz + bd / 2);
+  const tag = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.18), tagMat);
+  tag.position.set(cx - bw / 2 + 0.45, bh + 0.15, bd / 2);
   tag.rotation.x = -0.6;
-  g.add(tag);
+  tg.add(tag);
+
+  // the checkout, painted on the floor where the trolley can be pushed
+  paintWord(ctx, "CHECKOUT", r.ink, ox, oz + 0.85, 26, 5);
+
+  let state: "idle" | "locked" | "docked" = "idle";
+  const trolley: Trolley = {
+    group: tg,
+    home: [tx, tz],
+    checkout: [ox, oz],
+    homeCell: [r.x + 6, r.y + 5],
+    checkoutCell: [r.x + 9, r.y + 5],
+    at: "home",
+    docked: false,
+    setPose(x, z) {
+      tg.position.set(x, 0, z);
+    },
+    handle(x) {
+      return new THREE.Vector3(x + HANDLE_X, HANDLE_Y, tz);
+    },
+    status(st) {
+      state = st;
+      if (st === "idle") drawTag("TROLLEY 0.97", PAL.accent);
+      else if (st === "locked") drawTag("DOCKING", PAL.search);
+      else drawTag("DOCKED", "#2f8f5b");
+      detMat.uniforms.uColor.value.set(st === "idle" ? PAL.accent : st === "locked" ? PAL.search : "#2f8f5b");
+      ctx.kick();
+    },
+  };
+  const ix: Interactable[] = [
+    {
+      id: "trolley",
+      room: 5,
+      name: "Trolley",
+      kind: "active",
+      blurb: "The in-store robot's perception finds it. Dock with the arm on the handle, then push it to the checkout and back.",
+      targets: [body],
+      anchor: () => new THREE.Vector3(tg.position.x, 1.35, tg.position.z),
+      highlight: glow([body]),
+    },
+  ];
+
   let k = 0;
   return {
     room: 5,
     group: g,
+    ix,
+    trolley,
     update(now, dt, inside) {
-      const target = inside ? 1 : 0;
+      const target = inside || state !== "idle" ? 1 : 0;
       const prevK = k;
       k += (target - k) * Math.min(1, dt * (ctx.reduced ? 100 : 5));
-      const flick = ctx.reduced ? 1 : 0.85 + 0.15 * Math.sin(now * 6);
+      const flick = ctx.reduced || state !== "idle" ? 1 : 0.85 + 0.15 * Math.sin(now * 6);
       detMat.uniforms.uOpacity.value = k * flick;
       tagMat.uniforms.uOpacity.value = k;
       detMesh.visible = tag.visible = k > 0.01;
-      return Math.abs(k - prevK) > 0.001 || (inside && !ctx.reduced);
+      return Math.abs(k - prevK) > 0.001 || (inside && !ctx.reduced && state === "idle");
     },
   };
 }
@@ -954,6 +1102,7 @@ function tii(ctx: Ctx, r: RoomDef): Fx {
       pos[a] = p[Math.min(p.length - 1, Math.round(tt))];
     }
     agents.instanceMatrix.needsUpdate = true;
+    agents.computeBoundingSphere();
     shadows.instanceMatrix.needsUpdate = true;
     // dots the agents have passed disappear
     const mtd = new THREE.Matrix4();
@@ -973,10 +1122,26 @@ function tii(ctx: Ctx, r: RoomDef): Fx {
     return tt;
   };
   place(0, 0);
+  const ix: Interactable[] = [
+    {
+      id: "mapf",
+      room: 6,
+      name: "MAPF swarm",
+      kind: "passive",
+      blurb: "Six robots plan around you with prioritized space-time A*: each reserves its cells in time so nobody collides. Drive in and they ring you.",
+      targets: [agents],
+      anchor: () => {
+        const c = new THREE.Vector3(gx(r.x + r.w / 2), 1.1, gz(r.y + r.h / 2));
+        return c;
+      },
+      highlight: glow([agents]),
+    },
+  ];
 
   return {
     room: 6,
     group: g,
+    ix,
     update(now, dt, inside) {
       if (ctx.reduced) {
         if (inside && round === 0) {
@@ -1110,23 +1275,99 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
   let fault = -1;
   let faultAt = 0;
   const col = new THREE.Color();
-  const place = (now: number) => {
-    // a flock circling over the room, breathing in and out
+
+  // each drone flies itself: an acceleration toward its slot, damping, and separation from its
+  // neighbours. The slot is on a slow circle over the room, or, when M4 is in the room, around M4.
+  const pos = new Float32Array(N * 3);
+  const vel = new Float32Array(N * 3);
+  const acc = new Float32Array(N * 3);
+  let lead = 0;
+  const circle = (i: number, now: number, out: number[]) => {
+    const ph = (i / N) * Math.PI * 2;
+    const lane = i % 3;
+    const th = now * (0.42 + lane * 0.05) + ph;
+    const rad = 2.1 + lane * 0.55 + 0.35 * Math.sin(now * 0.6 + i * 1.3);
+    out[0] = cx + Math.cos(th) * rad;
+    out[1] = 1.55 + lane * 0.28 + 0.16 * Math.sin(now * 1.1 + i * 2.1);
+    out[2] = cz + Math.sin(th) * rad * 0.82;
+  };
+  const around = (i: number, now: number, out: number[]) => {
+    // a loose flock around and a little behind the robot, at its height (or above it on the ground)
+    const ph = (i / N) * Math.PI * 2 + now * 0.55;
+    const lane = i % 3;
+    const rad = 0.95 + lane * 0.42;
+    const back = 0.35;
+    const h = ctx.robot.heading;
+    out[0] = ctx.robot.x - Math.cos(h) * back + Math.cos(ph) * rad;
+    out[1] = (ctx.robot.flying ? ctx.robot.alt : 0.9) + 0.3 + lane * 0.22 + 0.12 * Math.sin(now * 1.3 + i);
+    out[2] = ctx.robot.z - Math.sin(h) * back + Math.sin(ph) * rad;
+  };
+  const a = [0, 0, 0];
+  const b = [0, 0, 0];
+  for (let i = 0; i < N; i++) {
+    circle(i, 0, a);
+    pos.set(a, i * 3);
+  }
+  const step = (now: number, dt: number) => {
     for (let i = 0; i < N; i++) {
-      const ph = (i / N) * Math.PI * 2;
-      const lane = i % 3;
-      const th = now * (0.42 + lane * 0.05) + ph;
-      const rad = 2.1 + lane * 0.55 + 0.35 * Math.sin(now * 0.6 + i * 1.3);
-      let y = 1.55 + lane * 0.28 + 0.16 * Math.sin(now * 1.1 + i * 2.1);
-      let dip = 0;
+      circle(i, now, a);
+      if (lead > 0.001) {
+        around(i, now, b);
+        for (let k = 0; k < 3; k++) a[k] += (b[k] - a[k]) * lead;
+      }
+      const o = i * 3;
+      for (let k = 0; k < 3; k++) acc[o + k] = 16 * (a[k] - pos[o + k]) - 6.5 * vel[o + k];
+    }
+    // keep a little distance from each other (and from the robot)
+    for (let i = 0; i < N; i++)
+      for (let j = i + 1; j < N; j++) {
+        const dx = pos[i * 3] - pos[j * 3];
+        const dy = pos[i * 3 + 1] - pos[j * 3 + 1];
+        const dz = pos[i * 3 + 2] - pos[j * 3 + 2];
+        const d2 = dx * dx + dy * dy + dz * dz;
+        if (d2 > 0.3 || d2 < 1e-6) continue;
+        const f = (0.3 - d2) * 40;
+        acc[i * 3] += dx * f;
+        acc[i * 3 + 1] += dy * f;
+        acc[i * 3 + 2] += dz * f;
+        acc[j * 3] -= dx * f;
+        acc[j * 3 + 1] -= dy * f;
+        acc[j * 3 + 2] -= dz * f;
+      }
+    const ry = ctx.robot.flying ? ctx.robot.alt + 0.25 : 0.55;
+    for (let i = 0; i < N; i++) {
+      const o = i * 3;
+      const dx = pos[o] - ctx.robot.x;
+      const dz = pos[o + 2] - ctx.robot.z;
+      const dy = pos[o + 1] - ry;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < 0.8 && lead > 0.01) {
+        const f = (0.8 - d2) * 30;
+        acc[o] += dx * f;
+        acc[o + 1] += Math.abs(dy) * f * 0.5;
+        acc[o + 2] += dz * f;
+      }
+      for (let k = 0; k < 3; k++) {
+        vel[o + k] += acc[o + k] * dt;
+        pos[o + k] += vel[o + k] * dt;
+      }
+    }
+  };
+
+  const place = (now: number) => {
+    for (let i = 0; i < N; i++) {
+      const o = i * 3;
+      let y = pos[o + 1];
       if (i === fault) {
         const t = now - faultAt;
-        dip = t < 0.7 ? t / 0.7 : Math.max(0, 1 - (t - 0.7) / 1.4);
+        const dip = t < 0.7 ? t / 0.7 : Math.max(0, 1 - (t - 0.7) / 1.4);
         y -= dip * 0.75;
         drones.setColorAt(i, col.copy(white).lerp(red, Math.min(1, dip * 1.6)));
       }
-      p.set(cx + Math.cos(th) * rad, y, cz + Math.sin(th) * rad * 0.82);
-      e.set(0.12 * Math.sin(now + i), -th, -0.25);
+      p.set(pos[o], y, pos[o + 2]);
+      // face where it flies, bank into its acceleration
+      const yaw = Math.atan2(vel[o + 2], vel[o]);
+      e.set(THREE.MathUtils.clamp(acc[o + 2] * 0.01, -0.4, 0.4), -yaw, THREE.MathUtils.clamp(-acc[o] * 0.01, -0.4, 0.4));
       q.setFromEuler(e);
       mt.compose(p, q, one);
       drones.setMatrixAt(i, mt);
@@ -1134,20 +1375,52 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
       shadows.setMatrixAt(i, mt);
     }
     drones.instanceMatrix.needsUpdate = true;
+    drones.computeBoundingSphere();
     shadows.instanceMatrix.needsUpdate = true;
     if (drones.instanceColor) drones.instanceColor.needsUpdate = true;
   };
   place(0);
+  const ix: Interactable[] = [
+    {
+      id: "flock",
+      room: 8,
+      name: "Swarm",
+      kind: "passive",
+      blurb: "Thirty drones, each steering by acceleration toward its place in the flock. Come into the room, rolling or flying, and they flock with you.",
+      targets: [drones],
+      anchor: () => {
+        let x = 0;
+        let y = 0;
+        let z = 0;
+        for (let i = 0; i < N; i++) {
+          x += pos[i * 3];
+          y += pos[i * 3 + 1];
+          z += pos[i * 3 + 2];
+        }
+        return new THREE.Vector3(x / N, y / N + 0.5, z / N);
+      },
+      highlight: glow([drones]),
+    },
+  ];
   return {
     room: 8,
     group: g,
-    update(now) {
+    ix,
+    update(now, dt, inside) {
       if (ctx.reduced) return false;
+      lead += ((inside ? 1 : 0) - lead) * Math.min(1, dt * 1.6);
       // every few seconds one drone fails, drops, and the layer recovers it
       if (now - faultAt > 4.5) {
         if (fault >= 0) drones.setColorAt(fault, white);
         fault = Math.floor((now * 7.3) % N);
         faultAt = now;
+      }
+      // small fixed steps keep the flock stable on a slow frame
+      let left = Math.min(dt, 0.1);
+      while (left > 1e-4) {
+        const h = Math.min(left, 1 / 60);
+        step(now, h);
+        left -= h;
       }
       place(now);
       return true;

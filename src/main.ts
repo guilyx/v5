@@ -1,6 +1,7 @@
 import "./styles.css";
 import { H, ROOMS, W, WALL, buildMaze, idx, wallRuns } from "./maze/layout";
-import type { MazeApi, MotionState, PlanRow } from "./maze/world";
+import type { HoverInfo, MazeApi, MotionState, PlanRow } from "./maze/world";
+import type { IxAction, PddlView } from "./maze/tasks";
 import type { PlanKind } from "./maze/modal";
 
 /*
@@ -109,6 +110,7 @@ function setView(view: "maze" | "list") {
     }
   } else {
     api?.pause(true);
+    closeCard();
     articles.forEach((a) => a.classList.remove("is-active"));
     root.classList.remove("sheet-open", "map-open");
     const target = articles[current];
@@ -335,6 +337,7 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Escape") {
     toggleMap(false);
     setSheet(false);
+    closeCard();
     return;
   }
   if (KEYS[e.code]) {
@@ -518,6 +521,152 @@ function setCost(on: boolean) {
 costBtn.addEventListener("click", () => setCost(!costOn));
 root.classList.add("costmap-on");
 
+/* ------------------------------------------------------------------ things to do with objects */
+
+const ixCard = document.getElementById("ixcard") as HTMLElement;
+const ixName = document.getElementById("ix-name")!;
+const ixChip = document.getElementById("ix-chip")!;
+const ixBlurb = document.getElementById("ix-blurb")!;
+const ixActions = document.getElementById("ix-actions")!;
+const tryBoxes = Array.from(document.querySelectorAll<HTMLElement>(".try[data-ix]"));
+let card: HoverInfo | null = null;
+let cardOver = false;
+let hideTimer = 0;
+let cardRaf = 0;
+
+/** the buttons for what you can do with an object; rebuilt only when the choices change */
+function actionButtons(holder: HTMLElement, id: string, acts: IxAction[], inCard: boolean) {
+  const sig = acts.map((a) => a.id).join(",");
+  if (holder.dataset.sig === sig) return;
+  holder.dataset.sig = sig;
+  const hadFocus = holder.contains(document.activeElement);
+  holder.replaceChildren(
+    ...acts.map((a) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `btn btn-sm ${a.primary ? "btn-solve-inline" : "btn-quiet"}`;
+      b.textContent = a.label;
+      b.addEventListener("click", () => {
+        api?.run(id, a.id);
+        hideHint();
+        // from the story sheet on a phone: get out of the way so you can watch
+        if (!inCard) setSheet(false);
+      });
+      return b;
+    }),
+  );
+  if (hadFocus) (holder.firstElementChild as HTMLElement | null)?.focus();
+}
+
+function refreshActions() {
+  if (!api) return;
+  for (const box of tryBoxes) {
+    const id = box.dataset.ix!;
+    actionButtons(box.querySelector<HTMLElement>(".try-actions")!, id, api.actions(id), false);
+  }
+  if (card) actionButtons(ixActions, card.id, api.actions(card.id), true);
+}
+
+function showCard(info: HoverInfo | null) {
+  clearTimeout(hideTimer);
+  if (!info) {
+    // a moment's grace, so the pointer can travel from the object onto the card
+    hideTimer = window.setTimeout(() => {
+      if (!cardOver) closeCard();
+    }, 260);
+    return;
+  }
+  card = info;
+  ixName.textContent = info.name;
+  ixChip.textContent = info.kind === "active" ? "Active" : "Passive";
+  ixChip.className = `chip chip-${info.kind}`;
+  ixBlurb.textContent = info.blurb;
+  actionButtons(ixActions, info.id, info.actions, true);
+  ixCard.hidden = false;
+  placeCard();
+}
+function closeCard() {
+  card = null;
+  cardOver = false;
+  ixCard.hidden = true;
+  cancelAnimationFrame(cardRaf);
+  cardRaf = 0;
+}
+/** the card rides above its object as the camera moves */
+function placeCard() {
+  cancelAnimationFrame(cardRaf);
+  cardRaf = 0;
+  if (!card || !api) return;
+  const p = api.anchor(card.id);
+  ixCard.style.visibility = p ? "" : "hidden";
+  if (p) {
+    const w = ixCard.offsetWidth;
+    const h = ixCard.offsetHeight;
+    const x = Math.max(8, Math.min(innerWidth - w - 8, p.x - w / 2));
+    const y = Math.max(70, Math.min(innerHeight - h - 8, p.y - h - 16));
+    ixCard.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  }
+  cardRaf = requestAnimationFrame(placeCard);
+}
+ixCard.addEventListener("pointerenter", () => {
+  cardOver = true;
+  clearTimeout(hideTimer);
+});
+ixCard.addEventListener("pointerleave", (e) => {
+  cardOver = false;
+  if (e.pointerType === "mouse") showCard(null);
+});
+
+/* the blocks world's planner, live: state, goal, plan, and the PDDL it read */
+const pddlInit = document.getElementById("pddl-init")!;
+const pddlGoal = document.getElementById("pddl-goal")!;
+const pddlPlan = document.getElementById("pddl-plan")!;
+const pddlStats = document.getElementById("pddl-stats")!;
+const pddlDomain = document.getElementById("pddl-domain")!;
+const pddlProblem = document.getElementById("pddl-problem")!;
+let pddlNote = "";
+
+function drawStacks(el: HTMLElement, st: string[][]) {
+  el.replaceChildren(
+    ...st.map((s) => {
+      const col = document.createElement("span");
+      col.className = "stack";
+      for (const b of s) {
+        const k = document.createElement("b");
+        k.className = `blk blk-${b}`;
+        k.textContent = b.toUpperCase();
+        col.appendChild(k);
+      }
+      return col;
+    }),
+  );
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", st.map((s) => s.slice().reverse().map((b) => b.toUpperCase()).join(" on ")).join("; ") + "; on the table");
+}
+
+function showPddl(v: PddlView) {
+  drawStacks(pddlInit, v.init);
+  drawStacks(pddlGoal, v.goal);
+  pddlPlan.replaceChildren(
+    ...v.plan.map((p) => {
+      const li = document.createElement("li");
+      li.textContent = p.text;
+      li.className = `is-${p.state}`;
+      if (p.state === "now") li.setAttribute("aria-current", "step");
+      return li;
+    }),
+  );
+  pddlPlan.hidden = !v.plan.length;
+  const parts: string[] = [];
+  if (v.plan.length) parts.push(`${v.plan.length} actions, optimal`);
+  if (v.expanded) parts.push(`A* with h_max: ${v.expanded} states expanded, ${v.grounded} ground actions, ${v.facts} facts`);
+  pddlStats.textContent = [v.note, parts.join(" · ")].filter(Boolean).join(" ");
+  pddlDomain.textContent = v.domain;
+  pddlProblem.textContent = v.problem;
+  if (v.note && v.note !== pddlNote && isMaze()) announce.textContent = v.note;
+  pddlNote = v.note;
+}
+
 /* ------------------------------------------------------------------ the maze */
 
 function insets() {
@@ -588,6 +737,9 @@ async function boot() {
         project: (key) => {
           document.querySelectorAll(".card").forEach((c) => c.classList.toggle("is-playing", (c as HTMLElement).dataset.key === key));
         },
+        hover: (info) => showCard(info),
+        tasks: () => refreshActions(),
+        pddl: (v) => showPddl(v),
       },
     );
   } catch (err) {
@@ -597,6 +749,7 @@ async function boot() {
     return;
   }
   root.classList.add("maze-ready");
+  refreshActions();
   api.setPref(Number(pref.value) / 100);
   if (kind !== "hybrid") api.setKind(kind);
   if (!costOn) api.costmap(false);

@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { PAL, clay, plain, tint } from "./gfx";
+import { type ArmParts, STOW, buildArm } from "./arm";
 
 /**
  * A toy version of Caltech's M4, the multi-modal robot that rolls and flies: a low body on four
@@ -34,6 +35,8 @@ export interface M4Parts {
   blurs: THREE.Mesh[];
   eyes: THREE.Group;
   puck: THREE.Group;
+  /** the manipulator on its back */
+  arm: ArmParts;
   /** fold the legs: 0 rolling, 1 flying */
   setMorph(k: number): void;
   /**
@@ -84,9 +87,9 @@ export function buildM4(o: { ghost?: THREE.ColorRepresentation; scale?: number }
       h.translate(sx * HIP_X, HIP_Y, sz * (HIP_Z - 0.01));
       add(h, "#47454e");
     }
-  // lidar mast
+  // lidar mast, up front, so the arm can fold along the back
   const mast = new THREE.CylinderGeometry(0.045, 0.055, 0.05, 14);
-  mast.translate(-0.08, HIP_Y + 0.12, 0);
+  mast.translate(0.13, HIP_Y + 0.11, 0);
   add(mast, "#3a3840");
   const chassis = new THREE.Mesh(mergeGeometries(parts), mat);
   lift.add(chassis);
@@ -119,8 +122,12 @@ export function buildM4(o: { ghost?: THREE.ColorRepresentation; scale?: number }
       ),
     );
   }
-  puck.position.set(-0.08, HIP_Y + 0.175, 0);
+  puck.position.set(0.13, HIP_Y + 0.165, 0);
   lift.add(puck);
+
+  const arm = buildArm(ghostMat ?? undefined);
+  arm.set(STOW, 0);
+  lift.add(arm.group);
 
   // legs and wheels
   const legParts = [
@@ -200,6 +207,7 @@ export function buildM4(o: { ghost?: THREE.ColorRepresentation; scale?: number }
     blurs,
     eyes,
     puck,
+    arm,
     setMorph(k) {
       const a = (smooth(k) * Math.PI) / 2;
       // each leg swings up and out: +z legs about -x, the mirrored -z legs about +x

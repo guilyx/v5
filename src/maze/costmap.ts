@@ -103,3 +103,10 @@ export function buildCostmaps(m: Maze): Costmaps {
     }
   return { data, width: w, height: h, rollCell };
 }
+
+/** the grid changed (a prop moved): rebuild both layers in place, so every reader sees the new map */
+export function rebuildCostmaps(m: Maze, cm: Costmaps) {
+  const n = buildCostmaps(m);
+  cm.data.set(n.data);
+  cm.rollCell.set(n.rollCell);
+}

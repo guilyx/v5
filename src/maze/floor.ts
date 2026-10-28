@@ -227,6 +227,8 @@ export interface Floor {
   uniforms: Record<string, THREE.IUniform>;
   /** light up the states A* closed (cell * 2 + mode), in order, starting at time t */
   showSearch(expanded: number[], t: number, duration: number): void;
+  /** the grid changed (a prop moved): re-bake the shadows and upload the new costmap */
+  refresh(): void;
 }
 
 export function buildFloor(m: Maze, cm: Costmaps): Floor {
@@ -285,6 +287,12 @@ export function buildFloor(m: Maze, cm: Costmaps): Floor {
         search[c * 2 + 1] = expanded[i] & 1;
       }
       searchTex.needsUpdate = true;
+    },
+    refresh() {
+      const old = uniforms.uBake.value as THREE.DataTexture;
+      uniforms.uBake.value = bake(m);
+      old.dispose();
+      costTex.needsUpdate = true;
     },
   };
 }

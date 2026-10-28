@@ -1037,6 +1037,226 @@ blockquote {
   cursor: pointer;
 }
 
+/* ------------------------------------------------------------------ interactive objects: the hover card and "Try it" */
+.btn-sm {
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 14.5px;
+  gap: 6px;
+}
+.chip {
+  display: inline-block;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.chip-active {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent-ink);
+}
+.chip-passive {
+  background: color-mix(in srgb, var(--search) 13%, transparent);
+  color: var(--search-ink);
+}
+.ixcard {
+  position: fixed;
+  z-index: 25;
+  left: 0;
+  top: 0;
+  width: 280px;
+  padding: 14px 16px 16px;
+  border-radius: 16px;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+  will-change: transform;
+}
+.ixcard[hidden] {
+  display: none;
+}
+.ixcard::after {
+  /* a little tail toward the object */
+  content: "";
+  position: absolute;
+  left: calc(50% - 7px);
+  bottom: -6px;
+  width: 14px;
+  height: 14px;
+  background: var(--paper);
+  transform: rotate(45deg);
+  border-radius: 0 0 3px 0;
+}
+.ix-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.ix-name {
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.ix-blurb {
+  margin: 6px 0 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+.ix-actions,
+.try-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ix-actions:not(:empty) {
+  margin-top: 12px;
+}
+.try-actions:not(:empty) {
+  margin: 14px 0 4px;
+}
+html:not(.maze-ready) .try {
+  display: none;
+}
+.try {
+  margin-top: 22px;
+  padding: 16px 18px 18px;
+  border-radius: 16px;
+  background: var(--paper-2);
+}
+.try-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.room-body .try h3 {
+  margin: 0;
+}
+.room-body .try p {
+  margin: 8px 0 0;
+  font-size: 16px;
+}
+.pddl-state {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 14px 0 0;
+}
+.pddl-state figure {
+  margin: 0;
+}
+.pddl-state figcaption {
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--muted);
+}
+.pddl-arrow {
+  padding-bottom: 6px;
+  color: var(--muted);
+}
+.stacks {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  min-height: 84px;
+  padding: 0 6px;
+  border-bottom: 3px solid #7d72c4;
+}
+.stack {
+  display: flex;
+  flex-direction: column-reverse;
+}
+.blk {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  color: #fffaf1;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1.5px rgba(0, 0, 0, 0.1);
+}
+.blk-a {
+  background: #e4572e;
+}
+.blk-b {
+  background: #3a6bf0;
+}
+.blk-c {
+  background: #f1b33b;
+  color: var(--ink);
+}
+.blk-d {
+  background: #2f9b78;
+}
+.pddl-plan {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: act;
+}
+.pddl-plan[hidden] {
+  display: none;
+}
+.room-body .pddl-plan li {
+  counter-increment: act;
+  padding: 3px 9px;
+  border-radius: 8px;
+  background: var(--paper);
+  font: 600 13.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--ink-2);
+  transition: background 0.2s, color 0.2s;
+}
+.pddl-plan li::before {
+  content: counter(act) ". ";
+  color: var(--muted);
+}
+.pddl-plan li.is-now {
+  background: var(--search);
+  color: #fff;
+}
+.pddl-plan li.is-now::before {
+  color: rgba(255, 255, 255, 0.75);
+}
+.pddl-plan li.is-done {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--muted) 50%, transparent);
+}
+.room-body .pddl-stats {
+  font-size: 14px;
+  color: var(--muted);
+}
+.room-body .pddl-stats:empty {
+  display: none;
+}
+.pddl-src {
+  margin-top: 8px;
+}
+.pddl-src summary {
+  cursor: pointer;
+  font: 600 14px/1.6 ui-monospace, "SF Mono", Menlo, monospace;
+  color: var(--search-ink);
+}
+.pddl-src pre {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 10px;
+  background: var(--paper);
+  font: 500 12.5px/1.5 ui-monospace, "SF Mono", Menlo, monospace;
+  white-space: pre;
+}
+
 /* ------------------------------------------------------------------ maze mode: the page doesn't scroll, the panel does */
 .is-maze body {
   overflow: hidden;

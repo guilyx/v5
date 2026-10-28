@@ -25,6 +25,11 @@ before the robot sets off. Every room is a chapter of his career, and walking
   land (over a wall, it hops to the nearest floor first). Left alone in the
   air, it lands by itself after a while.
 - **C**, or the Costmap button: the local costmap around the robot.
+- **Point at an object**: a card says what it is, whether it's *active* (you
+  ask the robot to do something with it) or *passive* (it reacts to the robot
+  by itself), and what you can do. Click the object to do the main thing; on
+  a phone, tap it to pin the card. The same actions are in each room's "Try
+  it" box in the story panel.
 - **Planner** card: pick Hybrid, Roll only or Fly only, and slide between
   saving energy and saving time.
 - **Scroll** (or swipe up, or press Page Down): the next room, in order. One
@@ -45,11 +50,11 @@ before the robot sets off. Every room is a chapter of his career, and walking
 | 01 | Nantes | A resistor, a capacitor and a breadboard |
 | 02 | Hiventive | The room is the chip: graphite package, gold pins, an STM32 die with TIM, I2C, CAN, GPIO, USART |
 | 03 | Coimbra | A small maze on a table that a small robot keeps solving, and two trophies: mapped, unmapped |
-| 04 | Centrale Nantes | The two papers on easels, and an inverted pendulum balancing |
-| 05 | Coalescent | Supermarket aisles and a trolley that gets a detection box when you walk in |
+| 04 | Centrale Nantes | The two papers on easels, an inverted pendulum balancing, and a blocks-world table: a PDDL planner, and M4's arm carries out the plan |
+| 05 | Coalescent | Supermarket aisles and a trolley that gets a detection box when you walk in; M4 can dock to it and push it to the checkout |
 | 06 | TII | Six robots plan around you with prioritized space-time A* (a PyMAPF nod); −74% CPU and −52% bandwidth painted on the floor |
 | 07 | Unchained Labs | An intent → agents → jobs graph with pulses running along it |
-| 08 | SIRB.AI | A flock of drones; now and then one fails, drops, and recovers |
+| 08 | SIRB.AI | A flock of drones that forms up around M4 and follows it, rolling or flying; now and then one fails, drops, and recovers |
 | 09 | Projects | The eight project clips on screens; the one you stand at plays |
 | 10 | Off the clock | His photos, printed and scattered on the floor (click one) |
 | 11 | Exit | A finish line, a mailbox, and how to reach him |
@@ -80,6 +85,36 @@ before the robot sets off. Every room is a chapter of his career, and walking
   wall and prop is an obstacle; flying, only the frame is. The floor shader
   draws a rolling window of it around the robot and cross-fades the layers as
   it morphs.
+
+## Things to do with objects
+
+| Object | Room | Kind | What happens |
+| -- | -- | -- | -- |
+| Blocks world | Centrale | active | **Solve with PDDL**: plan, drive to the table, pick and place. **New goal**: random towers |
+| Trolley | Coalescent | active | **Detect & dock**, **Push to checkout** / **back**, **Undock** |
+| MAPF swarm | TII | passive | The six robots replan around M4 and ring it |
+| Flock | SIRB.AI | passive | Thirty drones flock with M4, at its height when it flies |
+| Pendulum | Centrale | passive | Balances by itself |
+
+- **The arm** (`src/maze/arm.ts`): a turret, a shoulder, an elbow and a wrist
+  that keeps the gripper pointing down, so reaching a point is a 3-DOF problem
+  with a closed-form, elbow-up solution. It folds flat along the spine, and
+  stays folded in the air.
+- **The PDDL planner** (`src/maze/pddl.ts`) parses the domain and the problem
+  from the same text the panel shows, grounds every action over the objects,
+  and runs A* with h_max (admissible, so plans are optimal). Four blocks
+  ground to 40 actions and 29 facts; a plan takes a few milliseconds.
+- **Plans become motion** (`src/maze/tasks.ts`): each action compiles to arm
+  moves (above, down, grip, up) solved by IK against a simulation of the
+  table, so every move targets where the blocks will be. Callbacks in the
+  step queue hand a block to the gripper and back, and tick the plan in the
+  panel.
+- **Docking** lines up behind the trolley, grabs the handle, and pushes it in
+  a straight line. Parked, its cell is an obstacle; docked, it isn't. Both
+  costmap layers and the baked floor shadow are rebuilt when it moves.
+- **Anything else you ask for lets go first**: a held block goes back on the
+  table, a docked trolley is pushed to the nearest spot and released, and the
+  arm folds. Solve again and the planner starts from wherever the blocks are.
 
 ## How it's built
 
@@ -117,11 +152,15 @@ src/maze/layout.ts      the seeded grid and the rooms (no three.js)
 src/maze/astar.ts       grid helpers: nearest floor cell, clearance checks, line-of-sight smoothing
 src/maze/modal.ts       multi-modal A*: roll, fly, morph; the cost model
 src/maze/costmap.ts     rolling and flying costmaps (nav2-style inflation)
-src/maze/motion.ts      plan execution, morph timeline, flight follower, the ghost's rehearsal
+src/maze/motion.ts      plan execution (drive, fly, morph, line, turn, arm, grip, callbacks), the ghost's rehearsal
 src/maze/m4.ts          the M4 model
+src/maze/arm.ts         the arm on M4's back and its closed-form IK
+src/maze/pddl.ts        a small PDDL parser, grounder and A* (h_max) planner; the blocks domain
+src/maze/blocks.ts      the blocks-world table
+src/maze/tasks.ts       active interactions: PDDL plans and docking compiled into motion steps
 src/maze/drive.ts       differential-drive kinematics + pure pursuit
 src/maze/mapf.ts        prioritized space-time A* for the swarm room
-src/maze/world.ts       renderer, camera, input, planning, preview, tour, sleep
+src/maze/world.ts       renderer, camera, input, hover cards, planning, preview, tour, sleep
 src/maze/floor.ts       floor shader, baked light, search texture, costmap window
 src/maze/walls.ts       the walls
 src/maze/robot.ts       the small robots in the swarm room

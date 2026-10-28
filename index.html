@@ -119,6 +119,15 @@
       </span>
     </div>
 
+    <div class="ixcard" id="ixcard" role="group" aria-labelledby="ix-name" hidden>
+      <div class="ix-head">
+        <span class="ix-name" id="ix-name"></span>
+        <span class="chip" id="ix-chip"></span>
+      </div>
+      <p class="ix-blurb" id="ix-blurb"></p>
+      <div class="ix-actions" id="ix-actions"></div>
+    </div>
+
     <p class="sr-only" id="announce" aria-live="polite"></p>
 
     <main id="rooms" class="rooms" tabindex="-1">
@@ -151,6 +160,10 @@
               <li><b>F</b> folds the wheels into rotors and takes off; F again lands. <b>C</b> shows the local costmap.</li>
               <li><b>Scroll, or press Solve.</b> It visits every room in order: one room per chapter.</li>
               <li><b>Arrow keys or WASD</b> drive it by hand, on the ground or in the air.</li>
+              <li>
+                <b>Point at things.</b> Some you can use (stack blocks with a PDDL plan, dock a trolley); others react to you
+                on their own (a flock, a swarm).
+              </li>
             </ul>
             <div class="actions">
               <button class="btn btn-solve-inline" type="button" data-action="solve">Solve the maze</button>
@@ -244,6 +257,26 @@
               <span>Preprint · 2021</span>
             </li>
           </ul>
+          <section class="try maze-only" data-ix="blocks" aria-labelledby="try-blocks">
+            <div class="try-head">
+              <h3 id="try-blocks">Try it: a PDDL planner on the arm</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              The table in this room is a blocks world. The planner reads the PDDL below, finds the shortest plan with A*,
+              and M4's arm carries it out, one block at a time.
+            </p>
+            <div class="pddl-state">
+              <figure><figcaption>Now</figcaption><div class="stacks" id="pddl-init"></div></figure>
+              <span class="pddl-arrow" aria-hidden="true">→</span>
+              <figure><figcaption>Goal</figcaption><div class="stacks" id="pddl-goal"></div></figure>
+            </div>
+            <div class="try-actions"></div>
+            <ol class="pddl-plan" id="pddl-plan"></ol>
+            <p class="pddl-stats" id="pddl-stats"></p>
+            <details class="pddl-src"><summary>domain.pddl</summary><pre id="pddl-domain"></pre></details>
+            <details class="pddl-src"><summary>problem.pddl</summary><pre id="pddl-problem"></pre></details>
+          </section>
           <p class="aside">The robot you're driving runs the one-robot version of the first paper's problem.</p>
         </div>
       </article>
@@ -265,6 +298,17 @@
             engineer, ran planning, and turned the CEO's requirements into sprints.
           </p>
           <blockquote>A real store changes your priorities fast.</blockquote>
+          <section class="try maze-only" data-ix="trolley" aria-labelledby="try-trolley">
+            <div class="try-head">
+              <h3 id="try-trolley">Try it: dock the trolley</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              Drive in and the detector locks onto the trolley. M4 lines up behind it, grabs the handle with its arm, and
+              pushes it to the checkout. The costmap follows the trolley wherever it's parked.
+            </p>
+            <div class="try-actions"></div>
+          </section>
         </div>
       </article>
 
@@ -310,6 +354,14 @@
             The little robots around you are planning together: each one reserves its cells in space and time, so nobody
             collides. A small nod to PyMAPF. The robot you're driving is a toy M4: press F and its wheels fold into rotors.
           </p>
+          <section class="try maze-only" data-ix="mapf" aria-labelledby="try-mapf">
+            <div class="try-head">
+              <h3 id="try-mapf">Try it: drive into the swarm</h3>
+              <span class="chip chip-passive">Passive</span>
+            </div>
+            <p>Nothing to press: drive in and the six robots replan around you, then gather in a ring.</p>
+            <div class="try-actions"></div>
+          </section>
         </div>
       </article>
 
@@ -363,6 +415,17 @@
             <span lang="ar">سرب</span> (sirb) is Arabic for a flock, or a swarm. Watch the drones over this room: now and
             then one fails and drops, and the flock brings it back.
           </p>
+          <section class="try maze-only" data-ix="flock" aria-labelledby="try-flock">
+            <div class="try-head">
+              <h3 id="try-flock">Try it: fly with the flock</h3>
+              <span class="chip chip-passive">Passive</span>
+            </div>
+            <p>
+              Come into the room, rolling or flying, and the drones form up around M4 and follow you, keeping their distance
+              from each other and from you. Leave, and they go back to their circle.
+            </p>
+            <div class="try-actions"></div>
+          </section>
         </div>
       </article>
 

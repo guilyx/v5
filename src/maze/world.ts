@@ -8,10 +8,11 @@ import { LIGHT, PAL, blobMaterial, clay } from "./gfx";
 import { TRACK, WHEEL_R, buildM4 } from "./m4";
 import { ALT, Motion, type Pose, Rehearsal, type Step } from "./motion";
 import { FLY, type Mode, type ModalPlan, type PlanKind, ROLL, canFly, planModal, weights } from "./modal";
-import { buildCostmaps } from "./costmap";
+import { buildCostmaps, rebuildCostmaps } from "./costmap";
 import { Lidar, type PathPiece, PathDots, Tracks } from "./fx";
 import { Atlas } from "./paint";
-import { type Fx, buildRooms } from "./props";
+import { type Fx, type Interactable, buildRooms } from "./props";
+import { type IxAction, type PddlView, Tasks } from "./tasks";
 
 export interface Insets {
   right: number;
@@ -30,6 +31,17 @@ export interface PlanRow {
   flown: number;
 }
 
+/** what the card over a hovered object shows */
+export interface HoverInfo {
+  id: string;
+  name: string;
+  kind: "active" | "passive";
+  blurb: string;
+  actions: IxAction[];
+  /** tapped on a touch screen: the card stays until you tap elsewhere */
+  pinned: boolean;
+}
+
 export interface MazeEvents {
   room(i: number): void;
   pose(x: number, z: number, heading: number, flying: boolean): void;
@@ -41,6 +53,11 @@ export interface MazeEvents {
   autopilot(on: boolean, progress: number): void;
   photo(i: number): void;
   project(key: string | null): void;
+  /** the pointer is on an interactive object, or left it */
+  hover(info: HoverInfo | null): void;
+  /** what you can do with objects changed (a task started or ended) */
+  tasks(): void;
+  pddl(v: PddlView): void;
 }
 
 export interface MazeApi {
@@ -59,7 +76,11 @@ export interface MazeApi {
   /** 0 = save energy, 1 = save time */
   setPref(p: number): void;
   costmap(on: boolean): void;
-  stats(): { cpu: number; upd: number; calls: number; tris: number; dpr: number; frames: number; programs: number; textures: number; geometries: number; pose: { x: number; z: number; alt: number; fold: number; mode: number; steps: number } };
+  /** interactive objects: what you can do with one, do it, and where it is on screen */
+  actions(id: string): IxAction[];
+  run(id: string, action: string): void;
+  anchor(id: string): { x: number; y: number } | null;
+  stats(): { cpu: number; upd: number; calls: number; tris: number; dpr: number; frames: number; programs: number; textures: number; geometries: number; pose: { x: number; z: number; alt: number; fold: number; mode: number; steps: number; stowed: boolean; busy: boolean } };
 }
 
 export function startMaze(
@@ -138,7 +159,7 @@ export function startMaze(
   /* ---------------------------------------------------------------- the rooms */
   const atlas = new Atlas(2048);
   const decals: THREE.BufferGeometry[] = [];
-  const robotPos = { x: motion.x, z: motion.z };
+  const robotPos = { x: motion.x, z: motion.z, alt: 0, heading: motion.heading, flying: false };
   let raf = 0;
   const ctx = {
     maze,
@@ -159,6 +180,68 @@ export function startMaze(
   paintMesh.renderOrder = 1;
   scene.add(paintMesh);
   const pickables = rooms.flatMap((f) => f.pick ?? []);
+
+  /* ---------------------------------------------------------------- things to do with objects */
+  let gridDirty = false;
+  const tasks = new Tasks(
+    {
+      motion,
+      scale: SCALE,
+      grip: bot.arm.grip,
+      driveThen(cell, before, after) {
+        solve(false);
+        return planTo(cell[0], cell[1], false, before, after);
+      },
+      run(steps) {
+        solve(false);
+        pending = null;
+        motion.setSteps(steps);
+        wake();
+      },
+      goRoom: (i) => {
+        solve(false);
+        goRoom(i);
+      },
+      setCell(x, y, v) {
+        maze.grid[idx(x, y)] = v;
+        gridDirty = true;
+      },
+      changed: () => {
+        ev.tasks();
+        if (hovered) emitHover(hovered, hoverPinned);
+      },
+      pddl: (v) => ev.pddl(v),
+      rand: Math.random,
+    },
+    rooms,
+  );
+  const ixById = new Map(tasks.ix.map((i) => [i.id, i]));
+  const ixTargets = tasks.ix.flatMap((i) => i.targets.map((o) => ({ o, i })));
+  let hovered: Interactable | null = null;
+  let hoverPinned = false;
+  function emitHover(i: Interactable | null, pinned = false) {
+    if (hovered && hovered !== i) hovered.highlight(false);
+    hovered = i;
+    hoverPinned = !!i && pinned;
+    i?.highlight(true);
+    ev.hover(i ? { id: i.id, name: i.name, kind: i.kind, blurb: i.blurb, actions: tasks.actions(i.id), pinned } : null);
+    kick();
+  }
+  /** the interactive object under the pointer, if any (nearer than the floor) */
+  function ixHit(): Interactable | null {
+    if (!ixTargets.length) return null;
+    const hits = ray.intersectObjects(
+      ixTargets.map((t) => t.o),
+      true,
+    );
+    for (const h of hits) {
+      for (let o: THREE.Object3D | null = h.object; o; o = o.parent) {
+        const t = ixTargets.find((x) => x.o === o);
+        if (t) return t.i;
+      }
+    }
+    return null;
+  }
   const approached = new Set<number>();
   const roomCenter = ROOMS.map((r) => cellToWorld(r.x + (r.w - 1) / 2, r.y + (r.h - 1) / 2));
 
@@ -303,7 +386,11 @@ export function startMaze(
     kick();
   }
 
-  function planTo(tx: number, ty: number, dry = false) {
+  /**
+   * Plan to a cell and drive there. `before` runs first (put down what the arm holds), `after` once
+   * there (a task). Without either, it's a plain drive: whatever the robot was doing is released.
+   */
+  function planTo(tx: number, ty: number, dry = false, before?: Step[], after?: Step[]) {
     const goal = nearestFree(maze, tx, ty);
     if (!goal) return false;
     const res = solveAll(goal[0], goal[1]);
@@ -312,7 +399,12 @@ export function startMaze(
     lastGoal = goal;
     emitRows(res.rows, res.chosen, dry);
     const now = clock();
-    const { steps, pieces } = realize(plan, res.start.mode);
+    const route = realize(plan, res.start.mode);
+    const { pieces } = route;
+    const pre = before ?? (after || dry ? [] : tasks.release());
+    // a task starts on the ground: land first if the plan ends in the air
+    const post: Step[] = after ? [{ kind: "morph", to: ROLL }, ...after] : [];
+    const steps = [...pre, ...route.steps, ...post];
     const searchDur = reduced ? 0 : THREE.MathUtils.clamp(plan.expanded.length * 0.0028, 0.16, 0.6);
     floor.showSearch(plan.expanded, now, searchDur);
     goalRoom = maze.roomOf[idx(goal[0], goal[1])];
@@ -340,13 +432,14 @@ export function startMaze(
       motion.place(end[0], end[1], h, ROLL);
       look.set(motion.x, 0, motion.z);
       fadeDotsAt = now + 1.6;
-      arrived(now);
+      if (pre.length || post.length) motion.setSteps([...pre, ...post]);
+      else arrived(now);
     } else {
       dots.set(pieces, now + searchDur * 0.6, ALT);
       motion.cancel();
       pending = { steps, at: now + searchDur * (motion.speed > 0.5 ? 0.3 : 0.75) };
       // the ghost runs the plan first, fast, so you see what's about to happen
-      rehearsal = { r: new Rehearsal(currentPose(), steps), at: now + searchDur * 0.45 };
+      rehearsal = { r: new Rehearsal(currentPose(), route.steps), at: now + searchDur * 0.45 };
     }
     wake();
     return true;
@@ -376,9 +469,10 @@ export function startMaze(
     if (dots.length) fadeDotsAt = clock();
     floor.uniforms.uGoal.value.z = 0;
     lastInput = clock();
+    const pre = tasks.release();
     if (motion.mode === ROLL) {
-      if (reduced) motion.place(motion.x, motion.z, motion.heading, FLY);
-      else motion.setSteps([{ kind: "morph", to: FLY }]);
+      if (reduced && !pre.length) motion.place(motion.x, motion.z, motion.heading, FLY);
+      else motion.setSteps([...pre, { kind: "morph", to: FLY }]);
     } else {
       const [cx, cy] = worldToCell(motion.x, motion.z);
       const steps: Step[] = [];
@@ -400,6 +494,15 @@ export function startMaze(
     tourTarget = i;
     const [ax, ay] = maze.anchors[i];
     planTo(ax, ay);
+  }
+
+  /** do something with an object: from its card, a click on it, or the story panel */
+  function run(id: string, action: string) {
+    solve(false);
+    lastInput = clock();
+    tasks.run(id, action);
+    if (hovered?.id === id) emitHover(hovered, hoverPinned);
+    wake();
   }
 
   function goCell(x: number, y: number) {
@@ -475,6 +578,22 @@ export function startMaze(
           }
         }
       }
+      const it = ixHit();
+      if (it) {
+        if (d.type === "mouse") {
+          // a click does the main thing; the card stays up with what's next
+          const acts = tasks.actions(it.id);
+          const main = acts.find((a) => a.primary) ?? (it.kind === "passive" ? acts[0] : undefined);
+          if (main) {
+            run(it.id, main.id);
+            return;
+          }
+        } else {
+          emitHover(it, true);
+          return;
+        }
+      }
+      if (hoverPinned) emitHover(null);
       const c = floorCell();
       if (c) goCell(c[0], c[1]);
     } else if (d.type !== "mouse" && Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx) * 1.4 && performance.now() - d.t < 700) {
@@ -484,8 +603,20 @@ export function startMaze(
   canvas.addEventListener("pointermove", (e) => {
     if (e.pointerType !== "mouse") return;
     toNdc(e);
-    const c = floorCell();
     const u = floor.uniforms.uHover.value as THREE.Vector3;
+    const it = ixHit();
+    if (it !== hovered && !hoverPinned) emitHover(it);
+    if (it) {
+      // pointing at an object: its card, not a plan to the floor under it
+      canvas.style.cursor = "pointer";
+      if (u.z !== 0) {
+        u.z = 0;
+        queuePreview(null);
+        kick();
+      }
+      return;
+    }
+    const c = floorCell();
     if (c && c[0] >= 0 && c[1] >= 0 && c[0] < W && c[1] < H && maze.grid[idx(c[0], c[1])] === FLOOR) {
       const [x, z] = cellToWorld(c[0], c[1]);
       if (u.x !== x || u.y !== z || u.z !== 1) {
@@ -494,14 +625,15 @@ export function startMaze(
         queuePreview(c);
         kick();
       }
-    } else if (u.z !== 0) {
+    } else if (u.z !== 0 || canvas.style.cursor) {
       u.z = 0;
       canvas.style.cursor = "";
       queuePreview(null);
       kick();
     }
   });
-  canvas.addEventListener("pointerleave", () => {
+  canvas.addEventListener("pointerleave", (e) => {
+    if (e.pointerType === "mouse" && hovered && !hoverPinned) emitHover(null);
     (floor.uniforms.uHover.value as THREE.Vector3).z = 0;
     queuePreview(null);
     kick();
@@ -600,6 +732,15 @@ export function startMaze(
     if (motion.flying && !motion.active && !keys.x && !keys.y && !auto.on && now - lastInput > 14) toggleFly();
     robotPos.x = motion.x;
     robotPos.z = motion.z;
+    robotPos.alt = motion.alt;
+    robotPos.heading = motion.heading;
+    robotPos.flying = flyingNow;
+    tasks.update();
+    if (gridDirty) {
+      gridDirty = false;
+      rebuildCostmaps(maze, costmaps);
+      floor.refresh();
+    }
 
     // robot pose: legs, rotors, wheels, banking
     const tRotor = THREE.MathUtils.clamp((motion.fold - 0.25) / 0.45, 0, 1);
@@ -612,6 +753,7 @@ export function startMaze(
       roll.pos += (drive.v - drive.w * TRACK * SCALE) * k * dt;
     }
     bot.setMorph(motion.fold);
+    bot.arm.set(motion.armQ, motion.grip);
     bot.setSpin(roll.neg, roll.pos, propAngle, rotor > 0.55 ? 1 : 0);
     const bob = motion.alt > 0.05 && !reduced ? Math.sin(now * 2.1) * 0.035 * (motion.alt / ALT) : 0;
     bot.root.position.set(motion.x, motion.alt + bob, motion.z);
@@ -826,6 +968,15 @@ export function startMaze(
       costOn = on;
       wake();
     },
+    actions: (id) => tasks.actions(id),
+    run,
+    anchor(id) {
+      const i = ixById.get(id);
+      if (!i) return null;
+      const p = i.anchor().project(camera);
+      if (p.z > 1) return null;
+      return { x: ((p.x + 1) / 2) * width, y: ((1 - p.y) / 2) * height };
+    },
     pause(p) {
       paused = p;
       if (p) {
@@ -849,7 +1000,7 @@ export function startMaze(
       programs: renderer.info.programs?.length ?? 0,
       textures: renderer.info.memory.textures,
       geometries: renderer.info.memory.geometries,
-      pose: { x: motion.x, z: motion.z, alt: motion.alt, fold: motion.fold, mode: motion.mode, steps: motion.steps.length },
+      pose: { x: motion.x, z: motion.z, alt: motion.alt, fold: motion.fold, mode: motion.mode, steps: motion.steps.length, stowed: motion.stowed, busy: tasks.busy },
     }),
   };
 }
