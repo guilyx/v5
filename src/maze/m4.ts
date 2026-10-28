@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { PAL, clay, plain, tint } from "./gfx";
+import { type ArmParts, STOW, buildArm } from "./arm";
 
 /**
  * A toy version of Caltech's M4, the multi-modal robot that rolls and flies: a low body on four
@@ -24,6 +25,13 @@ export const WHEEL_R = 0.12;
 export const TRACK = HIP_Z + STUB;
 /** the body drops this far when the legs fold on the ground */
 const SIT = 0.21;
+/** the onboard RGB-D camera's lens, on the nose (robot-local, unscaled) */
+export const LENS = { x: 0.3, y: 0.405 };
+/** the LiDAR's scan centre, low in the front bumper, at the height of a trolley's legs */
+export const LIDAR = { x: 0.3, y: 0.215 };
+/** how far the lift deck rises, and the deck's top at rest */
+export const DECK_RISE = 0.1;
+export const DECK_TOP = 0.426;
 
 export interface M4Parts {
   root: THREE.Group;
@@ -34,6 +42,10 @@ export interface M4Parts {
   blurs: THREE.Mesh[];
   eyes: THREE.Group;
   puck: THREE.Group;
+  /** the manipulator on its left side */
+  arm: ArmParts;
+  /** raise the deck on the back: 0 down, 1 up (it lifts a trolley it's under) */
+  setLift(k: number): void;
   /** fold the legs: 0 rolling, 1 flying */
   setMorph(k: number): void;
   /**
@@ -84,10 +96,27 @@ export function buildM4(o: { ghost?: THREE.ColorRepresentation; scale?: number }
       h.translate(sx * HIP_X, HIP_Y, sz * (HIP_Z - 0.01));
       add(h, "#47454e");
     }
-  // lidar mast
-  const mast = new THREE.CylinderGeometry(0.045, 0.055, 0.05, 14);
-  mast.translate(-0.08, HIP_Y + 0.12, 0);
-  add(mast, "#3a3840");
+  // the RGB-D camera on the nose: a dark bar, two lenses and the IR projector between them
+  const cam = new THREE.BoxGeometry(0.05, 0.042, 0.15);
+  cam.translate(LENS.x - 0.035, LENS.y, 0);
+  add(cam, "#2a2830");
+  const camFoot = new THREE.BoxGeometry(0.04, 0.03, 0.05);
+  camFoot.translate(LENS.x - 0.05, LENS.y - 0.03, 0);
+  add(camFoot, "#3a3840");
+  for (const [z, r, c] of [
+    [-0.045, 0.014, "#3b5f9e"],
+    [0.045, 0.014, "#3b5f9e"],
+    [0, 0.009, "#7a2a2a"],
+  ] as [number, number, string][]) {
+    const lens = new THREE.CylinderGeometry(r, r, 0.012, 14);
+    lens.rotateZ(Math.PI / 2);
+    lens.translate(LENS.x - 0.008, LENS.y, z);
+    add(lens, c);
+  }
+  // the deck's well in the back, where the lift column comes up
+  const well = new THREE.CylinderGeometry(0.06, 0.06, 0.012, 20);
+  well.translate(-0.03, DECK_TOP - 0.02, 0);
+  add(well, "#3a3840");
   const chassis = new THREE.Mesh(mergeGeometries(parts), mat);
   lift.add(chassis);
 
@@ -104,14 +133,14 @@ export function buildM4(o: { ghost?: THREE.ColorRepresentation; scale?: number }
   }
   lift.add(eyes);
 
-  // the LiDAR puck, with one bright window so you can see it spin
+  // the LiDAR puck in the front bumper, with one bright window so you can see it spin
   const puck = new THREE.Group();
   if (!ghost) {
-    const drum = new THREE.CylinderGeometry(0.07, 0.07, 0.06, 18);
-    const win = new THREE.BoxGeometry(0.025, 0.028, 0.08);
-    win.translate(0.062, 0, 0);
-    const cap = new THREE.CylinderGeometry(0.058, 0.07, 0.016, 18);
-    cap.translate(0, 0.038, 0);
+    const drum = new THREE.CylinderGeometry(0.052, 0.052, 0.05, 18);
+    const win = new THREE.BoxGeometry(0.02, 0.024, 0.06);
+    win.translate(0.046, 0, 0);
+    const cap = new THREE.CylinderGeometry(0.045, 0.052, 0.012, 18);
+    cap.translate(0, 0.031, 0);
     puck.add(
       new THREE.Mesh(
         mergeGeometries([tint(plain(drum), "#2f2d35"), tint(plain(win), PAL.accent), tint(plain(cap), "#47454e")]),
@@ -119,8 +148,27 @@ export function buildM4(o: { ghost?: THREE.ColorRepresentation; scale?: number }
       ),
     );
   }
-  puck.position.set(-0.08, HIP_Y + 0.175, 0);
+  puck.position.set(LIDAR.x, LIDAR.y, 0);
   lift.add(puck);
+
+  // the lift deck: a rubber-topped plate on a column, flush with the back until it rises
+  const deck = new THREE.Group();
+  deck.add(
+    new THREE.Mesh(
+      mergeGeometries([
+        tint(plain(new THREE.BoxGeometry(0.3, 0.016, 0.2).translate(0, -0.008, 0)), "#2f2d35"),
+        tint(plain(new THREE.BoxGeometry(0.26, 0.006, 0.16).translate(0, 0.002, 0)), PAL.accent),
+        tint(plain(new THREE.CylinderGeometry(0.04, 0.04, 0.14, 14).translate(0, -0.08, 0)), "#9a98a2"),
+      ]),
+      ghostMat ?? clay({ vertexColors: true }),
+    ),
+  );
+  deck.position.set(-0.03, DECK_TOP, 0);
+  lift.add(deck);
+
+  const arm = buildArm(ghostMat ?? undefined);
+  arm.set(STOW, 0);
+  lift.add(arm.group);
 
   // legs and wheels
   const legParts = [
@@ -200,6 +248,10 @@ export function buildM4(o: { ghost?: THREE.ColorRepresentation; scale?: number }
     blurs,
     eyes,
     puck,
+    arm,
+    setLift(k) {
+      deck.position.y = DECK_TOP + DECK_RISE * k;
+    },
     setMorph(k) {
       const a = (smooth(k) * Math.PI) / 2;
       // each leg swings up and out: +z legs about -x, the mirrored -z legs about +x

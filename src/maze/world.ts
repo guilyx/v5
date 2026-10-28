@@ -5,13 +5,15 @@ import { nearestFree, pointClear, smooth } from "./astar";
 import { buildFloor } from "./floor";
 import { buildWalls } from "./walls";
 import { LIGHT, PAL, blobMaterial, clay } from "./gfx";
-import { TRACK, WHEEL_R, buildM4 } from "./m4";
+import { LENS, LIDAR, TRACK, WHEEL_R, buildM4 } from "./m4";
 import { ALT, Motion, type Pose, Rehearsal, type Step } from "./motion";
 import { FLY, type Mode, type ModalPlan, type PlanKind, ROLL, canFly, planModal, weights } from "./modal";
-import { buildCostmaps } from "./costmap";
+import { buildCostmaps, rebuildCostmaps } from "./costmap";
 import { Lidar, type PathPiece, PathDots, Tracks } from "./fx";
 import { Atlas } from "./paint";
-import { type Fx, buildRooms } from "./props";
+import { type Det, type Fx, type Interactable, TROLLEY, buildRooms } from "./props";
+import { Detector, RANGE, depthMaterial, drawDetections, drawFan, drawHud, drawTag, viewFan } from "./sensors";
+import { type IxAction, type PddlView, Tasks } from "./tasks";
 
 export interface Insets {
   right: number;
@@ -20,6 +22,10 @@ export interface Insets {
 }
 
 export type MotionState = "roll" | "fly" | "takeoff" | "landing";
+/** where the camera is: over the board, behind the robot, or the robot's own lens */
+export type View = "top" | "chase" | "fpv";
+/** the robot camera's picture-in-picture: off, colour, or depth */
+export type Feed = "off" | "rgb" | "depth";
 
 export interface PlanRow {
   kind: PlanKind;
@@ -28,6 +34,17 @@ export interface PlanRow {
   morphs: number;
   states: number;
   flown: number;
+}
+
+/** what the card over a hovered object shows */
+export interface HoverInfo {
+  id: string;
+  name: string;
+  kind: "active" | "passive";
+  blurb: string;
+  actions: IxAction[];
+  /** tapped on a touch screen: the card stays until you tap elsewhere */
+  pinned: boolean;
 }
 
 export interface MazeEvents {
@@ -41,6 +58,12 @@ export interface MazeEvents {
   autopilot(on: boolean, progress: number): void;
   photo(i: number): void;
   project(key: string | null): void;
+  /** the pointer is on an interactive object, or left it */
+  hover(info: HoverInfo | null): void;
+  /** what you can do with objects changed (a task started or ended) */
+  tasks(): void;
+  pddl(v: PddlView): void;
+  view(v: View): void;
 }
 
 export interface MazeApi {
@@ -59,13 +82,30 @@ export interface MazeApi {
   /** 0 = save energy, 1 = save time */
   setPref(p: number): void;
   costmap(on: boolean): void;
-  stats(): { cpu: number; upd: number; calls: number; tris: number; dpr: number; frames: number; programs: number; textures: number; geometries: number; pose: { x: number; z: number; alt: number; fold: number; mode: number; steps: number } };
+  /** interactive objects: what you can do with one, do it, and where it is on screen */
+  actions(id: string): IxAction[];
+  run(id: string, action: string): void;
+  anchor(id: string): { x: number; y: number } | null;
+  setView(v: View): void;
+  /** sensors: the LiDAR returns, the object detector, the camera window */
+  sensor(name: "lidar" | "detect", on: boolean): void;
+  feed(f: Feed): void;
+  stats(): { cpu: number; upd: number; calls: number; tris: number; dpr: number; frames: number; programs: number; textures: number; geometries: number; pose: { x: number; z: number; alt: number; fold: number; mode: number; steps: number; stowed: boolean; busy: boolean } };
 }
 
 export function startMaze(
   canvas: HTMLCanvasElement,
   maze: Maze,
-  opts: { reduced: boolean; insets: () => Insets; mobile: boolean; startRoom?: number },
+  opts: {
+    reduced: boolean;
+    insets: () => Insets;
+    mobile: boolean;
+    startRoom?: number;
+    /** a 2D canvas over the 3D one, for detections and the HUD */
+    overlay: HTMLCanvasElement;
+    /** the frame the robot camera's picture is drawn in */
+    pip: HTMLElement;
+  },
   ev: MazeEvents,
 ): MazeApi {
   const reduced = opts.reduced;
@@ -138,7 +178,7 @@ export function startMaze(
   /* ---------------------------------------------------------------- the rooms */
   const atlas = new Atlas(2048);
   const decals: THREE.BufferGeometry[] = [];
-  const robotPos = { x: motion.x, z: motion.z };
+  const robotPos = { x: motion.x, z: motion.z, alt: 0, heading: motion.heading, flying: false };
   let raf = 0;
   const ctx = {
     maze,
@@ -159,6 +199,94 @@ export function startMaze(
   paintMesh.renderOrder = 1;
   scene.add(paintMesh);
   const pickables = rooms.flatMap((f) => f.pick ?? []);
+
+  // driving by hand: keep the whole body (and the lens on its nose) out of walls and props
+  motion.isClear = (x, z) => pointClear(maze, x, z, 0.42);
+
+  /* ---------------------------------------------------------------- things to do with objects */
+  let gridDirty = false;
+  const lidarAt = () => ({
+    x: motion.x + Math.cos(motion.heading) * LIDAR.x * SCALE,
+    z: motion.z + Math.sin(motion.heading) * LIDAR.x * SCALE,
+    y: LIDAR.y * SCALE + motion.alt,
+  });
+  const tasks = new Tasks(
+    {
+      maze,
+      motion,
+      lidarAt,
+      eye: () => eyeCam,
+      scale: SCALE,
+      grip: bot.arm.grip,
+      driveThen(cell, before, after) {
+        solve(false);
+        return planTo(cell[0], cell[1], false, before, after);
+      },
+      run(steps) {
+        solve(false);
+        pending = null;
+        motion.setSteps(steps);
+        wake();
+      },
+      goRoom: (i) => {
+        solve(false);
+        goRoom(i);
+      },
+      setCell(x, y, v) {
+        maze.grid[idx(x, y)] = v;
+        gridDirty = true;
+      },
+      changed: () => {
+        ev.tasks();
+        if (hovered) emitHover(hovered, hoverPinned);
+      },
+      pddl: (v) => ev.pddl(v),
+      rand: Math.random,
+    },
+    rooms,
+  );
+  scene.add(tasks.fx.group);
+  const ixById = new Map(tasks.ix.map((i) => [i.id, i]));
+
+  // the trolley's legs, for the LiDAR: thin, and wrapped in tape that throws back a bright return
+  const trolley = rooms.find((f) => f.trolley)?.trolley;
+  const legXZ = new Float32Array(8);
+  const R2 = TROLLEY.legR * TROLLEY.legR;
+  if (trolley)
+    lidar.probe = (wx, wz) => {
+      const dx = wx - trolley.pose.x;
+      const dz = wz - trolley.pose.z;
+      // away from the trolley the grid decides; near it, only the legs are solid at scan height
+      if (dx * dx + dz * dz > 0.8) return -1;
+      for (let i = 0; i < 4; i++) if ((wx - legXZ[i * 2]) ** 2 + (wz - legXZ[i * 2 + 1]) ** 2 < R2) return 2;
+      return 0;
+    };
+  const ixTargets = tasks.ix.flatMap((i) => i.targets.map((o) => ({ o, i })));
+  let hovered: Interactable | null = null;
+  let hoverPinned = false;
+  function emitHover(i: Interactable | null, pinned = false) {
+    if (hovered && hovered !== i) hovered.highlight(false);
+    hovered = i;
+    hoverPinned = !!i && pinned;
+    i?.highlight(true);
+    ev.hover(i ? { id: i.id, name: i.name, kind: i.kind, blurb: i.blurb, actions: tasks.actions(i.id), pinned } : null);
+    kick();
+  }
+  /** the interactive object under the pointer, if any (nearer than the floor) */
+  function ixHit(): Interactable | null {
+    if (!ixTargets.length) return null;
+    const hits = ray.intersectObjects(
+      ixTargets.map((t) => t.o),
+      true,
+    );
+    for (const h of hits) {
+      for (let o: THREE.Object3D | null = h.object; o; o = o.parent) {
+        const t = ixTargets.find((x) => x.o === o);
+        if (t) return t.i;
+      }
+    }
+    return null;
+  }
   const approached = new Set<number>();
   const roomCenter = ROOMS.map((r) => cellToWorld(r.x + (r.w - 1) / 2, r.y + (r.h - 1) / 2));
 
@@ -168,34 +296,261 @@ export function startMaze(
   let camDist = 30;
   let width = 1;
   let height = 1;
+  let fullH = 1;
+  let pipRect: { x: number; y: number; w: number; h: number } | null = null;
+  const overlay = opts.overlay;
+  const octx = overlay.getContext("2d")!;
   function layout() {
     width = canvas.clientWidth || window.innerWidth;
     height = canvas.clientHeight || window.innerHeight;
     renderer.setSize(width, height, false);
+    overlay.width = Math.round(width * dpr);
+    overlay.height = Math.round(height * dpr);
+    overlayDirty = true;
     const ins = opts.insets();
     const cw = Math.max(200, width - ins.right);
     const ch = Math.max(200, height - ins.top - ins.bottom);
     const ppc = THREE.MathUtils.clamp(Math.min(cw / 16.5, ch / 11), opts.mobile ? 36 : 40, 74);
     const dy = ins.top / 2 - ins.bottom / 2; // content centre relative to screen centre
     const fullW = width + ins.right;
-    const fullH = height + 2 * Math.abs(dy);
+    fullH = height + 2 * Math.abs(dy);
     const offY = dy < 0 ? -2 * dy : 0;
     camera.aspect = fullW / fullH;
     camera.setViewOffset(fullW, fullH, ins.right, offY, width, height);
-    camDist = fullH / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * ppc);
-    camera.far = camDist * 4;
+    camDist = fullH / (2 * Math.tan(THREE.MathUtils.degToRad(FOV.top / 2)) * ppc);
+    camera.far = view === "top" ? camDist * 4 : 90;
     camera.updateProjectionMatrix();
-    LIGHT.uFogNear.value = camDist * 1.18;
-    LIGHT.uFogFar.value = camDist * 2.5;
-    (scene.fog as THREE.Fog).near = LIGHT.uFogNear.value;
-    (scene.fog as THREE.Fog).far = LIGHT.uFogFar.value;
-    lidar.uniforms.uScale.value = (fullH * dpr) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
-    placeCamera();
+    lidarScale();
+    measurePip();
+    placeCamera(0);
     kick();
   }
-  function placeCamera() {
-    camera.position.set(look.x, look.y + Math.sin(PITCH) * camDist, look.z + Math.cos(PITCH) * camDist);
-    camera.lookAt(look);
+  function lidarScale() {
+    lidar.uniforms.uScale.value = (fullH * dpr) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  }
+  /** the picture-in-picture's inner rectangle, in canvas pixels */
+  function measurePip() {
+    const el = opts.pip;
+    if (feedMode === "off" || el.hidden) {
+      pipRect = null;
+      return;
+    }
+    const r = el.getBoundingClientRect();
+    const c = canvas.getBoundingClientRect();
+    pipRect = { x: r.left - c.left + el.clientLeft, y: r.top - c.top + el.clientTop, w: el.clientWidth, h: el.clientHeight };
+    eyeCam.aspect = pipRect.w / Math.max(1, pipRect.h);
+    eyeCam.updateProjectionMatrix();
+  }
+
+  /* views: one camera, moved to the board view, a chase view, or the robot's lens, with a short blend between */
+  const FOV: Record<View, number> = { top: 30, chase: 52, fpv: 64 };
+  let view: View = "top";
+  const lens = new THREE.Object3D();
+  // on the nose, just ahead of the visor; tilted down a little, more in the air
+  lens.position.set(LENS.x, LENS.y, 0);
+  lens.rotation.order = "YXZ";
+  lens.rotation.y = -Math.PI / 2;
+  bot.lift.add(lens);
+  const eyeCam = new THREE.PerspectiveCamera(62, 16 / 10, 0.05, RANGE + 6);
+  const eyePos = new THREE.Vector3();
+  const eyeQuat = new THREE.Quaternion();
+  const blend = { t: 1, pos: new THREE.Vector3(), quat: new THREE.Quaternion(), fov: FOV.top, near: 0.5, fog: [0, 0] as [number, number] };
+  const chase = { h: 0, pos: new THREE.Vector3(), at: new THREE.Vector3() };
+  const UP = new THREE.Vector3(0, 1, 0);
+  const tPos = new THREE.Vector3();
+  const tQuat = new THREE.Quaternion();
+  const tAt = new THREE.Vector3();
+  const tM = new THREE.Matrix4();
+  const fogFor = (v: View): [number, number] => (v === "top" ? [camDist * 1.18, camDist * 2.5] : v === "chase" ? [9, 26] : [6.5, 21]);
+
+  function placeCamera(dt: number) {
+    let near = 0.5;
+    if (view === "top") {
+      tPos.set(look.x, look.y + Math.sin(PITCH) * camDist, look.z + Math.cos(PITCH) * camDist);
+      tM.lookAt(tPos, look, UP);
+      tQuat.setFromRotationMatrix(tM);
+    } else if (view === "fpv") {
+      tPos.copy(eyePos);
+      tQuat.copy(eyeQuat);
+      near = 0.03;
+    } else {
+      // behind and above, following the heading with a lag, like a chase camera on a car
+      const k = reduced || !dt ? 1 : 1 - Math.exp(-dt / 0.3);
+      let dh = motion.heading - chase.h;
+      dh = Math.atan2(Math.sin(dh), Math.cos(dh));
+      chase.h += dh * k;
+      const c = Math.cos(chase.h);
+      const sn = Math.sin(chase.h);
+      tPos.set(motion.x - c * 2.6, 1.45 + motion.alt, motion.z - sn * 2.6);
+      tAt.set(motion.x + c * 1.4, 0.3 + motion.alt * 0.9, motion.z + sn * 1.4);
+      chase.pos.lerp(tPos, k);
+      chase.at.lerp(tAt, k);
+      tPos.copy(chase.pos);
+      tM.lookAt(tPos, chase.at, UP);
+      tQuat.setFromRotationMatrix(tM);
+      near = 0.08;
+    }
+    let fov = FOV[view];
+    let [fn, ff] = fogFor(view);
+    if (blend.t < 1) {
+      const e = blend.t * blend.t * (3 - 2 * blend.t);
+      camera.position.lerpVectors(blend.pos, tPos, e);
+      camera.quaternion.slerpQuaternions(blend.quat, tQuat, e);
+      fov = blend.fov + (fov - blend.fov) * e;
+      near = Math.min(near, blend.near);
+      fn = blend.fog[0] + (fn - blend.fog[0]) * e;
+      ff = blend.fog[1] + (ff - blend.fog[1]) * e;
+    } else {
+      camera.position.copy(tPos);
+      camera.quaternion.copy(tQuat);
+    }
+    if (camera.fov !== fov || camera.near !== near) {
+      camera.fov = fov;
+      camera.near = near;
+      camera.far = view === "top" && blend.t >= 1 ? camDist * 4 : 90;
+      camera.updateProjectionMatrix();
+      lidarScale();
+    }
+    LIGHT.uFogNear.value = fn;
+    LIGHT.uFogFar.value = ff;
+    (scene.fog as THREE.Fog).near = fn;
+    (scene.fog as THREE.Fog).far = ff;
+  }
+
+  function setView(v: View) {
+    if (v === view) return;
+    blend.pos.copy(camera.position);
+    blend.quat.copy(camera.quaternion);
+    blend.fov = camera.fov;
+    blend.near = camera.near;
+    blend.fog = [LIGHT.uFogNear.value, LIGHT.uFogFar.value];
+    blend.t = reduced ? 1 : 0;
+    if (v === "chase") {
+      chase.h = motion.heading;
+      chase.pos.set(motion.x - Math.cos(chase.h) * 2.6, 1.45 + motion.alt, motion.z - Math.sin(chase.h) * 2.6);
+      chase.at.set(motion.x, 0.3, motion.z);
+    }
+    view = v;
+    // hand-driving means something different in each view: stop whatever the keys were doing
+    keys.x = keys.y = 0;
+    motion.cmd = null;
+    overlayDirty = true;
+    ev.view(v);
+    wake();
+  }
+
+  /* sensors */
+  const sensors = { lidar: true, detect: false };
+  let feedMode: Feed = "off";
+  const detector = new Detector();
+  const dets: Det[] = [];
+  const detecting = rooms.filter((f) => f.detect);
+  const hudRooms = rooms.filter((f) => f.hud);
+  const hudV = new THREE.Vector3();
+  let fan: [number, number][] = [];
+  let fanAt = -1;
+  let overlayDirty = false;
+  const depthMat = depthMaterial(0.1, RANGE + 3);
+  const depthBg = new THREE.Color("#30123b");
+  const FONT = '"Geist Variable", ui-sans-serif, system-ui, sans-serif';
+
+  function sense(now: number) {
+    bot.root.updateMatrixWorld(true);
+    lens.getWorldPosition(eyePos);
+    lens.getWorldQuaternion(eyeQuat);
+    eyeCam.position.copy(eyePos);
+    eyeCam.quaternion.copy(eyeQuat);
+    eyeCam.updateMatrixWorld();
+    if (sensors.detect) {
+      dets.length = 0;
+      for (const f of detecting) f.detect!(dets);
+      detector.update(now, eyeCam, dets, maze, !reduced);
+    }
+    if ((sensors.detect || feedMode !== "off") && view !== "fpv" && now - fanAt > 0.1) {
+      fanAt = now;
+      const hfov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(eyeCam.fov / 2)) * eyeCam.aspect);
+      fan = viewFan(maze, eyePos.x, eyePos.z, eyePos.y, motion.heading, hfov);
+    }
+  }
+
+  function drawOverlay(now: number) {
+    const fanOn = view !== "fpv" && (sensors.detect || feedMode !== "off");
+    // rooms with a live readout (the swarm's network), while the camera is near them
+    const huds = hudRooms.filter((f) => {
+      const [rx, rz] = roomCenter[f.room];
+      return (rx - camera.position.x) ** 2 + (rz - camera.position.z) ** 2 < 26 * 26;
+    });
+    const need = sensors.detect || view === "fpv" || fanOn || tasks.fx.active || huds.length > 0;
+    if (!need && !overlayDirty) return;
+    const k = octx;
+    k.setTransform(dpr, 0, 0, dpr, 0, 0);
+    k.clearRect(0, 0, width, height);
+    overlayDirty = need;
+    if (!need) return;
+    if (fanOn) drawFan(k, fan, camera, width, height);
+    const live = sensors.detect ? detector.live(now) : [];
+    if (sensors.detect) drawDetections(k, live, camera, width, height, FONT);
+    if (tasks.fx.active) tasks.fx.draw2D(k, camera, width, height, FONT);
+    for (const f of huds) {
+      const hd = f.hud!();
+      if (!hd) continue;
+      hudV.copy(hd.at).applyMatrix4(camera.matrixWorldInverse);
+      if (hudV.z > -0.1) continue;
+      hudV.copy(hd.at).project(camera);
+      drawTag(k, ((hudV.x + 1) / 2) * width, ((1 - hudV.y) / 2) * height, hd.title, hd.lines, hd.color, width, height, FONT);
+    }
+    if (view === "fpv") {
+      const ins = opts.insets();
+      const sheet = ins.bottom > 0;
+      drawHud(
+        k,
+        {
+          heading: motion.heading,
+          speed: motion.speed,
+          alt: motion.alt,
+          mode: modeState === "roll" ? "rolling" : modeState === "fly" ? "flying" : modeState,
+          count: live.length,
+          detect: sensors.detect,
+        },
+        (width - ins.right) / 2,
+        sheet ? 236 : 70,
+        sheet ? height - ins.bottom - 4 : height - 84,
+        FONT,
+      );
+    }
+  }
+
+  /** the robot camera's picture, drawn into its frame after the main view */
+  function renderFeed() {
+    if (feedMode === "off" || !pipRect) return;
+    const { x, y, w, h } = pipRect;
+    const hide: THREE.Object3D[] = [lidar.points, dots.mesh, dots.rings, preview.mesh, preview.rings, ghost.root];
+    if (feedMode === "depth")
+      scene.traverse((o) => {
+        const m = (o as THREE.Mesh).material as THREE.Material | undefined;
+        if (o.visible && ((o as THREE.Points).isPoints || (m && !Array.isArray(m) && m.transparent))) hide.push(o);
+      });
+    const shown = hide.filter((o) => o.visible);
+    for (const o of shown) o.visible = false;
+    const fog = [LIGHT.uFogNear.value, LIGHT.uFogFar.value];
+    LIGHT.uFogNear.value = 6.5;
+    LIGHT.uFogFar.value = 21;
+    const bg = scene.background;
+    if (feedMode === "depth") {
+      scene.overrideMaterial = depthMat;
+      scene.background = depthBg;
+    }
+    renderer.setScissorTest(true);
+    renderer.setViewport(x, height - y - h, w, h);
+    renderer.setScissor(x, height - y - h, w, h);
+    renderer.render(scene, eyeCam);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, width, height);
+    scene.overrideMaterial = null;
+    scene.background = bg;
+    LIGHT.uFogNear.value = fog[0];
+    LIGHT.uFogFar.value = fog[1];
+    for (const o of shown) o.visible = true;
   }
 
   /* ---------------------------------------------------------------- planning */
@@ -303,7 +658,11 @@ export function startMaze(
     kick();
   }
 
-  function planTo(tx: number, ty: number, dry = false) {
+  /**
+   * Plan to a cell and drive there. `before` runs first (put down what the arm holds), `after` once
+   * there (a task). Without either, it's a plain drive: whatever the robot was doing is released.
+   */
+  function planTo(tx: number, ty: number, dry = false, before?: Step[], after?: Step[]) {
     const goal = nearestFree(maze, tx, ty);
     if (!goal) return false;
     const res = solveAll(goal[0], goal[1]);
@@ -312,7 +671,12 @@ export function startMaze(
     lastGoal = goal;
     emitRows(res.rows, res.chosen, dry);
     const now = clock();
-    const { steps, pieces } = realize(plan, res.start.mode);
+    const route = realize(plan, res.start.mode);
+    const { pieces } = route;
+    const pre = before ?? (after || dry ? [] : tasks.release());
+    // a task starts on the ground: land first if the plan ends in the air
+    const post: Step[] = after ? [{ kind: "morph", to: ROLL }, ...after] : [];
+    const steps = [...pre, ...route.steps, ...post];
     const searchDur = reduced ? 0 : THREE.MathUtils.clamp(plan.expanded.length * 0.0028, 0.16, 0.6);
     floor.showSearch(plan.expanded, now, searchDur);
     goalRoom = maze.roomOf[idx(goal[0], goal[1])];
@@ -340,13 +704,14 @@ export function startMaze(
       motion.place(end[0], end[1], h, ROLL);
       look.set(motion.x, 0, motion.z);
       fadeDotsAt = now + 1.6;
-      arrived(now);
+      if (pre.length || post.length) motion.setSteps([...pre, ...post]);
+      else arrived(now);
     } else {
       dots.set(pieces, now + searchDur * 0.6, ALT);
       motion.cancel();
       pending = { steps, at: now + searchDur * (motion.speed > 0.5 ? 0.3 : 0.75) };
       // the ghost runs the plan first, fast, so you see what's about to happen
-      rehearsal = { r: new Rehearsal(currentPose(), steps), at: now + searchDur * 0.45 };
+      rehearsal = { r: new Rehearsal(currentPose(), route.steps), at: now + searchDur * 0.45 };
     }
     wake();
     return true;
@@ -376,9 +741,10 @@ export function startMaze(
     if (dots.length) fadeDotsAt = clock();
     floor.uniforms.uGoal.value.z = 0;
     lastInput = clock();
+    const pre = tasks.release();
     if (motion.mode === ROLL) {
-      if (reduced) motion.place(motion.x, motion.z, motion.heading, FLY);
-      else motion.setSteps([{ kind: "morph", to: FLY }]);
+      if (reduced && !pre.length) motion.place(motion.x, motion.z, motion.heading, FLY);
+      else motion.setSteps([...pre, { kind: "morph", to: FLY }]);
     } else {
       const [cx, cy] = worldToCell(motion.x, motion.z);
       const steps: Step[] = [];
@@ -400,6 +766,15 @@ export function startMaze(
     tourTarget = i;
     const [ax, ay] = maze.anchors[i];
     planTo(ax, ay);
+  }
+
+  /** do something with an object: from its card, a click on it, or the story panel */
+  function run(id: string, action: string) {
+    solve(false);
+    lastInput = clock();
+    tasks.run(id, action);
+    if (hovered?.id === id) emitHover(hovered, hoverPinned);
+    wake();
   }
 
   function goCell(x: number, y: number) {
@@ -475,6 +850,22 @@ export function startMaze(
           }
         }
       }
+      const it = ixHit();
+      if (it) {
+        if (d.type === "mouse") {
+          // a click does the main thing; the card stays up with what's next
+          const acts = tasks.actions(it.id);
+          const main = acts.find((a) => a.primary) ?? (it.kind === "passive" ? acts[0] : undefined);
+          if (main) {
+            run(it.id, main.id);
+            return;
+          }
+        } else {
+          emitHover(it, true);
+          return;
+        }
+      }
+      if (hoverPinned) emitHover(null);
       const c = floorCell();
       if (c) goCell(c[0], c[1]);
     } else if (d.type !== "mouse" && Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx) * 1.4 && performance.now() - d.t < 700) {
@@ -484,8 +875,20 @@ export function startMaze(
   canvas.addEventListener("pointermove", (e) => {
     if (e.pointerType !== "mouse") return;
     toNdc(e);
-    const c = floorCell();
     const u = floor.uniforms.uHover.value as THREE.Vector3;
+    const it = ixHit();
+    if (it !== hovered && !hoverPinned) emitHover(it);
+    if (it) {
+      // pointing at an object: its card, not a plan to the floor under it
+      canvas.style.cursor = "pointer";
+      if (u.z !== 0) {
+        u.z = 0;
+        queuePreview(null);
+        kick();
+      }
+      return;
+    }
+    const c = floorCell();
     if (c && c[0] >= 0 && c[1] >= 0 && c[0] < W && c[1] < H && maze.grid[idx(c[0], c[1])] === FLOOR) {
       const [x, z] = cellToWorld(c[0], c[1]);
       if (u.x !== x || u.y !== z || u.z !== 1) {
@@ -494,14 +897,15 @@ export function startMaze(
         queuePreview(c);
         kick();
       }
-    } else if (u.z !== 0) {
+    } else if (u.z !== 0 || canvas.style.cursor) {
       u.z = 0;
       canvas.style.cursor = "";
       queuePreview(null);
       kick();
     }
   });
-  canvas.addEventListener("pointerleave", () => {
+  canvas.addEventListener("pointerleave", (e) => {
+    if (e.pointerType === "mouse" && hovered && !hoverPinned) emitHover(null);
     (floor.uniforms.uHover.value as THREE.Vector3).z = 0;
     queuePreview(null);
     kick();
@@ -584,9 +988,12 @@ export function startMaze(
       motion.setSteps(pending.steps);
       pending = null;
     }
-    keyStep();
-    motion.manual.x = motion.mode === FLY ? keys.x : 0;
-    motion.manual.y = motion.mode === FLY ? keys.y : 0;
+    // keys: board directions from above; forward and turn from behind or inside the robot
+    const own = view !== "top";
+    if (!own) keyStep();
+    motion.cmd = own && (keys.x || keys.y) && !motion.active ? { v: -keys.y, w: keys.x } : null;
+    motion.manual.x = !own && motion.mode === FLY ? keys.x : 0;
+    motion.manual.y = !own && motion.mode === FLY ? keys.y : 0;
     const was = motion.active || drive.active;
     const done = motion.update(dt, reduced);
     if (done) arrived(now);
@@ -600,6 +1007,15 @@ export function startMaze(
     if (motion.flying && !motion.active && !keys.x && !keys.y && !auto.on && now - lastInput > 14) toggleFly();
     robotPos.x = motion.x;
     robotPos.z = motion.z;
+    robotPos.alt = motion.alt;
+    robotPos.heading = motion.heading;
+    robotPos.flying = flyingNow;
+    if (tasks.update(now)) busy = true;
+    if (gridDirty) {
+      gridDirty = false;
+      rebuildCostmaps(maze, costmaps);
+      floor.refresh();
+    }
 
     // robot pose: legs, rotors, wheels, banking
     const tRotor = THREE.MathUtils.clamp((motion.fold - 0.25) / 0.45, 0, 1);
@@ -612,6 +1028,9 @@ export function startMaze(
       roll.pos += (drive.v - drive.w * TRACK * SCALE) * k * dt;
     }
     bot.setMorph(motion.fold);
+    bot.arm.set(motion.armQ, motion.grip);
+    bot.setLift(motion.lift);
+    lens.rotation.x = -(0.1 + 0.22 * motion.fold);
     bot.setSpin(roll.neg, roll.pos, propAngle, rotor > 0.55 ? 1 : 0);
     const bob = motion.alt > 0.05 && !reduced ? Math.sin(now * 2.1) * 0.035 * (motion.alt / ALT) : 0;
     bot.root.position.set(motion.x, motion.alt + bob, motion.z);
@@ -666,7 +1085,9 @@ export function startMaze(
     if (!flyingNow) tracks.update(now, motion.x, motion.z, motion.heading, motion.odo);
     else tracks.uniforms.uTime.value = now;
     const up = motion.fold > 0.5;
-    if (!reduced) lidar.update(now, dt, motion.x, motion.z, spin, up ? 0.7 : 0.3, up ? 0.78 : 0.5);
+    if (trolley) trolley.legs().forEach(([lx, lz], i) => legXZ.set([lx, lz], i * 2));
+    const lo = lidarAt();
+    if (!reduced) lidar.update(now, dt, lo.x, lo.z, spin, up ? 0.7 : 0.25, up ? 0.78 : lo.y);
     else lidar.uniforms.uTime.value = now;
     // the local costmap follows the robot, and switches layers as it morphs
     costVis += ((costOn ? 1 : 0) - costVis) * Math.min(1, dt * (reduced ? 60 : 6));
@@ -722,7 +1143,13 @@ export function startMaze(
     look.z += (tz - look.z) * k;
     look.y += (ty - look.y) * k;
     if (Math.abs(tx - look.x) + Math.abs(tz - look.z) + Math.abs(ty - look.y) > 0.002) busy = true;
-    placeCamera();
+    sense(now);
+    if (blend.t < 1) {
+      blend.t = Math.min(1, blend.t + dt / 0.6);
+      busy = true;
+    }
+    placeCamera(dt);
+    if (view === "chase" && chase.pos.distanceToSquared(tPos) > 1e-6) busy = true;
 
     // rooms near the camera animate; heavy media loads as the robot approaches
     if (wasAwake && !awake) for (const f of rooms) f.sleep?.();
@@ -742,6 +1169,8 @@ export function startMaze(
     const tu = performance.now() - t0;
     upd = upd ? upd * 0.95 + tu * 0.05 : tu;
     renderer.render(scene, camera);
+    renderFeed();
+    drawOverlay(now);
     const ft = performance.now() - t0;
     cpu = cpu ? cpu * 0.95 + ft * 0.05 : ft;
     frames++;
@@ -826,6 +1255,29 @@ export function startMaze(
       costOn = on;
       wake();
     },
+    setView,
+    sensor(name, on) {
+      sensors[name] = on;
+      if (name === "lidar") lidar.points.visible = on;
+      if (name === "detect" && !on) detector.clear();
+      overlayDirty = true;
+      wake();
+    },
+    feed(f) {
+      feedMode = f;
+      measurePip();
+      overlayDirty = true;
+      wake();
+    },
+    actions: (id) => tasks.actions(id),
+    run,
+    anchor(id) {
+      const i = ixById.get(id);
+      if (!i) return null;
+      const p = i.anchor().project(camera);
+      if (p.z > 1) return null;
+      return { x: ((p.x + 1) / 2) * width, y: ((1 - p.y) / 2) * height };
+    },
     pause(p) {
       paused = p;
       if (p) {
@@ -849,7 +1301,7 @@ export function startMaze(
       programs: renderer.info.programs?.length ?? 0,
       textures: renderer.info.memory.textures,
       geometries: renderer.info.memory.geometries,
-      pose: { x: motion.x, z: motion.z, alt: motion.alt, fold: motion.fold, mode: motion.mode, steps: motion.steps.length },
+      pose: { x: motion.x, z: motion.z, alt: motion.alt, fold: motion.fold, mode: motion.mode, steps: motion.steps.length, stowed: motion.stowed, busy: tasks.busy },
     }),
   };
 }

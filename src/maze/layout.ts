@@ -61,8 +61,9 @@ export const ROOMS: RoomDef[] = [
   },
   {
     id: "centrale", name: "Centrale Nantes", short: "Centrale", sub: "2019–2021 · RESEARCH", x: 43, y: 19, w: 11, h: 9,
-    tint: "#dcd8f2", ink: "#4b428f", anchor: [5, 4], label: [0.5, 8.1],
-    blocks: [[1, 0, 4, 1], [6, 0, 4, 1], [9, 5, 1, 1]],
+    tint: "#dcd8f2", ink: "#4b428f", anchor: [5, 5], label: [0.5, 8.1],
+    // posters, the pendulum, and the blocks table (the tour parks the robot in front of it)
+    blocks: [[1, 0, 4, 1], [6, 0, 4, 1], [9, 5, 1, 1], [4, 6, 3, 1]],
   },
   {
     id: "coalescent", name: "Coalescent", short: "Coalescent", sub: "2021–2022 · ODENSE", x: 29, y: 17, w: 11, h: 11,

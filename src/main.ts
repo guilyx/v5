@@ -1,6 +1,7 @@
 import "./styles.css";
 import { H, ROOMS, W, WALL, buildMaze, idx, wallRuns } from "./maze/layout";
-import type { MazeApi, MotionState, PlanRow } from "./maze/world";
+import type { Feed, HoverInfo, MazeApi, MotionState, PlanRow, View } from "./maze/world";
+import type { IxAction, PddlView } from "./maze/tasks";
 import type { PlanKind } from "./maze/modal";
 
 /*
@@ -27,7 +28,12 @@ const stat = document.getElementById("stat")!;
 const announce = document.getElementById("announce")!;
 const hint = document.getElementById("hint")!;
 const flyBtn = document.getElementById("fly-btn") as HTMLButtonElement;
-const costBtn = document.getElementById("cost-btn") as HTMLButtonElement;
+const viewBtn2 = document.getElementById("view-btn") as HTMLButtonElement;
+const sensorsBtn = document.getElementById("sensors-btn") as HTMLButtonElement;
+const sensorsPanel = document.getElementById("sensors") as HTMLElement;
+const pip = document.getElementById("pip") as HTMLElement;
+const pipLabel = document.getElementById("pip-label")!;
+const toast = document.getElementById("toast")!;
 const dockMode = document.getElementById("dock-mode")!;
 const planNote = document.getElementById("plan-note")!;
 const planRows = Array.from(document.querySelectorAll<HTMLButtonElement>(".plan-row"));
@@ -109,6 +115,8 @@ function setView(view: "maze" | "list") {
     }
   } else {
     api?.pause(true);
+    closeCard();
+    toggleSensors(false);
     articles.forEach((a) => a.classList.remove("is-active"));
     root.classList.remove("sheet-open", "map-open");
     const target = articles[current];
@@ -335,6 +343,8 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "Escape") {
     toggleMap(false);
     setSheet(false);
+    closeCard();
+    toggleSensors(false);
     return;
   }
   if (KEYS[e.code]) {
@@ -357,6 +367,26 @@ window.addEventListener("keydown", (e) => {
   if (e.code === "KeyC" && !e.repeat) {
     e.preventDefault();
     setCost(!costOn);
+    return;
+  }
+  if (e.code === "KeyV" && !e.repeat) {
+    e.preventDefault();
+    chooseView(VIEWS[(VIEWS.indexOf(viewNow) + 1) % VIEWS.length]);
+    return;
+  }
+  if (e.code === "KeyL" && !e.repeat) {
+    e.preventDefault();
+    setSensor("lidar", !sensorsOn.lidar);
+    return;
+  }
+  if (e.code === "KeyB" && !e.repeat) {
+    e.preventDefault();
+    setSensor("detect", !sensorsOn.detect);
+    return;
+  }
+  if (e.code === "KeyZ" && !e.repeat) {
+    e.preventDefault();
+    setFeed(FEEDS[(FEEDS.indexOf(feedNow) + 1) % FEEDS.length]);
     return;
   }
   const onControl = !!t.closest("a, button");
@@ -511,12 +541,234 @@ flyBtn.addEventListener("click", () => {
 });
 function setCost(on: boolean) {
   costOn = on;
-  costBtn.setAttribute("aria-pressed", String(on));
+  sensorSwitch("cost").setAttribute("aria-pressed", String(on));
   root.classList.toggle("costmap-on", on);
   api?.costmap(on);
 }
-costBtn.addEventListener("click", () => setCost(!costOn));
 root.classList.add("costmap-on");
+
+/* ------------------------------------------------------------------ views and sensors */
+
+const VIEWS: View[] = ["top", "chase", "fpv"];
+const VIEW_LABEL: Record<View, string> = { top: "Top", chase: "Chase", fpv: "First person" };
+const VIEW_HELP: Record<View, string> = {
+  top: "Top view.",
+  chase: "Chase view: W and S drive, A and D turn.",
+  fpv: "First person: W and S drive, A and D turn. Click the floor to go there.",
+};
+const FEEDS: Feed[] = ["off", "rgb", "depth"];
+let viewNow: View = "top";
+let feedNow: Feed = "off";
+const sensorsOn = { lidar: true, detect: false };
+const sensorSwitch = (name: string) => sensorsPanel.querySelector<HTMLButtonElement>(`[data-sensor="${name}"]`)!;
+let toastTimer = 0;
+
+function showToast(text: string) {
+  toast.textContent = text;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => toast.classList.remove("show"), 3800);
+}
+/** the world says which view it's in (it may have changed from a key) */
+function viewChanged(v: View) {
+  viewNow = v;
+  root.dataset.view = v;
+  viewBtn2.querySelector(".db-label")!.textContent = mobileMq.matches && v === "fpv" ? "FPV" : VIEW_LABEL[v];
+  viewBtn2.setAttribute("aria-label", `View: ${VIEW_LABEL[v]}. Switch view`);
+  sensorsPanel.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.view === v)));
+  if (isMaze()) {
+    announce.textContent = VIEW_HELP[v];
+    if (v !== "top") showToast(mobileMq.matches || matchMedia("(hover: none)").matches ? "Tap the floor to drive · V or View to switch" : VIEW_HELP[v]);
+    else toast.classList.remove("show");
+  }
+}
+function chooseView(v: View) {
+  api?.setView(v);
+  hideHint();
+}
+function setSensor(name: "lidar" | "detect", on: boolean) {
+  sensorsOn[name] = on;
+  sensorSwitch(name).setAttribute("aria-pressed", String(on));
+  api?.sensor(name, on);
+  if (isMaze()) announce.textContent = `${name === "lidar" ? "LiDAR" : "Object detection"} ${on ? "on" : "off"}.`;
+}
+function setFeed(f: Feed) {
+  feedNow = f;
+  sensorsPanel.querySelectorAll<HTMLButtonElement>("[data-feed]").forEach((b) => b.setAttribute("aria-checked", String(b.dataset.feed === f)));
+  pip.hidden = f === "off";
+  pip.dataset.feed = f;
+  pipLabel.textContent = f === "depth" ? "Depth · robot camera" : "Robot camera";
+  api?.feed(f);
+  if (isMaze()) announce.textContent = f === "off" ? "Robot camera window closed." : `Robot camera: ${f === "depth" ? "depth" : "colour"}.`;
+}
+function toggleSensors(open?: boolean) {
+  const o = open ?? sensorsPanel.hidden;
+  sensorsPanel.hidden = !o;
+  sensorsBtn.setAttribute("aria-expanded", String(o));
+}
+viewBtn2.addEventListener("click", () => chooseView(VIEWS[(VIEWS.indexOf(viewNow) + 1) % VIEWS.length]));
+sensorsBtn.addEventListener("click", () => toggleSensors());
+sensorsPanel.querySelectorAll<HTMLButtonElement>("[data-view]").forEach((b) => b.addEventListener("click", () => chooseView(b.dataset.view as View)));
+sensorsPanel.querySelectorAll<HTMLButtonElement>("[data-feed]").forEach((b) => b.addEventListener("click", () => setFeed(b.dataset.feed as Feed)));
+sensorsPanel.querySelectorAll<HTMLButtonElement>("[data-sensor]").forEach((b) =>
+  b.addEventListener("click", () => {
+    const name = b.dataset.sensor!;
+    if (name === "cost") setCost(!costOn);
+    else setSensor(name as "lidar" | "detect", !sensorsOn[name as "lidar" | "detect"]);
+  }),
+);
+// the panel closes when you click anywhere else
+document.addEventListener("pointerdown", (e) => {
+  if (sensorsPanel.hidden) return;
+  const t = e.target as HTMLElement;
+  if (!t.closest("#sensors, #sensors-btn")) toggleSensors(false);
+});
+
+/* ------------------------------------------------------------------ things to do with objects */
+
+const ixCard = document.getElementById("ixcard") as HTMLElement;
+const ixName = document.getElementById("ix-name")!;
+const ixChip = document.getElementById("ix-chip")!;
+const ixBlurb = document.getElementById("ix-blurb")!;
+const ixActions = document.getElementById("ix-actions")!;
+const tryBoxes = Array.from(document.querySelectorAll<HTMLElement>(".try[data-ix]"));
+let card: HoverInfo | null = null;
+let cardOver = false;
+let hideTimer = 0;
+let cardRaf = 0;
+
+/** the buttons for what you can do with an object; rebuilt only when the choices change */
+function actionButtons(holder: HTMLElement, id: string, acts: IxAction[], inCard: boolean) {
+  const sig = acts.map((a) => `${a.id}:${a.label}`).join(",");
+  if (holder.dataset.sig === sig) return;
+  holder.dataset.sig = sig;
+  const hadFocus = holder.contains(document.activeElement);
+  holder.replaceChildren(
+    ...acts.map((a) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = `btn btn-sm ${a.primary ? "btn-solve-inline" : "btn-quiet"}`;
+      b.textContent = a.label;
+      b.addEventListener("click", () => {
+        api?.run(id, a.id);
+        hideHint();
+        // from the story sheet on a phone: get out of the way so you can watch
+        if (!inCard) setSheet(false);
+      });
+      return b;
+    }),
+  );
+  if (hadFocus) (holder.firstElementChild as HTMLElement | null)?.focus();
+}
+
+function refreshActions() {
+  if (!api) return;
+  for (const box of tryBoxes) {
+    const id = box.dataset.ix!;
+    actionButtons(box.querySelector<HTMLElement>(".try-actions")!, id, api.actions(id), false);
+  }
+  if (card) actionButtons(ixActions, card.id, api.actions(card.id), true);
+}
+
+function showCard(info: HoverInfo | null) {
+  clearTimeout(hideTimer);
+  if (!info) {
+    // a moment's grace, so the pointer can travel from the object onto the card
+    hideTimer = window.setTimeout(() => {
+      if (!cardOver) closeCard();
+    }, 260);
+    return;
+  }
+  card = info;
+  ixName.textContent = info.name;
+  ixChip.textContent = info.kind === "active" ? "Active" : "Passive";
+  ixChip.className = `chip chip-${info.kind}`;
+  ixBlurb.textContent = info.blurb;
+  actionButtons(ixActions, info.id, info.actions, true);
+  ixCard.hidden = false;
+  placeCard();
+}
+function closeCard() {
+  card = null;
+  cardOver = false;
+  ixCard.hidden = true;
+  cancelAnimationFrame(cardRaf);
+  cardRaf = 0;
+}
+/** the card rides above its object as the camera moves */
+function placeCard() {
+  cancelAnimationFrame(cardRaf);
+  cardRaf = 0;
+  if (!card || !api) return;
+  const p = api.anchor(card.id);
+  ixCard.style.visibility = p ? "" : "hidden";
+  if (p) {
+    const w = ixCard.offsetWidth;
+    const h = ixCard.offsetHeight;
+    const x = Math.max(8, Math.min(innerWidth - w - 8, p.x - w / 2));
+    const y = Math.max(70, Math.min(innerHeight - h - 8, p.y - h - 16));
+    ixCard.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+  }
+  cardRaf = requestAnimationFrame(placeCard);
+}
+ixCard.addEventListener("pointerenter", () => {
+  cardOver = true;
+  clearTimeout(hideTimer);
+});
+ixCard.addEventListener("pointerleave", (e) => {
+  cardOver = false;
+  if (e.pointerType === "mouse") showCard(null);
+});
+
+/* the blocks world's planner, live: state, goal, plan, and the PDDL it read */
+const pddlInit = document.getElementById("pddl-init")!;
+const pddlGoal = document.getElementById("pddl-goal")!;
+const pddlPlan = document.getElementById("pddl-plan")!;
+const pddlStats = document.getElementById("pddl-stats")!;
+const pddlDomain = document.getElementById("pddl-domain")!;
+const pddlProblem = document.getElementById("pddl-problem")!;
+let pddlNote = "";
+
+function drawStacks(el: HTMLElement, st: string[][]) {
+  el.replaceChildren(
+    ...st.map((s) => {
+      const col = document.createElement("span");
+      col.className = "stack";
+      for (const b of s) {
+        const k = document.createElement("b");
+        k.className = `blk blk-${b}`;
+        k.textContent = b.toUpperCase();
+        col.appendChild(k);
+      }
+      return col;
+    }),
+  );
+  el.setAttribute("role", "img");
+  el.setAttribute("aria-label", st.map((s) => s.slice().reverse().map((b) => b.toUpperCase()).join(" on ")).join("; ") + "; on the table");
+}
+
+function showPddl(v: PddlView) {
+  drawStacks(pddlInit, v.init);
+  drawStacks(pddlGoal, v.goal);
+  pddlPlan.replaceChildren(
+    ...v.plan.map((p) => {
+      const li = document.createElement("li");
+      li.textContent = p.text;
+      li.className = `is-${p.state}`;
+      if (p.state === "now") li.setAttribute("aria-current", "step");
+      return li;
+    }),
+  );
+  pddlPlan.hidden = !v.plan.length;
+  const parts: string[] = [];
+  if (v.plan.length) parts.push(`${v.plan.length} actions, optimal`);
+  if (v.expanded) parts.push(`A* with h_max: ${v.expanded} states expanded, ${v.grounded} ground actions, ${v.facts} facts`);
+  pddlStats.textContent = [v.note, parts.join(" · ")].filter(Boolean).join(" ");
+  pddlDomain.textContent = v.domain;
+  pddlProblem.textContent = v.problem;
+  if (v.note && v.note !== pddlNote && isMaze()) announce.textContent = v.note;
+  pddlNote = v.note;
+}
 
 /* ------------------------------------------------------------------ the maze */
 
@@ -558,7 +810,14 @@ async function boot() {
     api = startMaze(
       canvas,
       maze,
-      { reduced, insets, startRoom, mobile: mobileMq.matches || matchMedia("(pointer: coarse)").matches },
+      {
+        reduced,
+        insets,
+        startRoom,
+        mobile: mobileMq.matches || matchMedia("(pointer: coarse)").matches,
+        overlay: document.getElementById("overlay") as HTMLCanvasElement,
+        pip,
+      },
       {
         room: (i) => showRoom(i),
         pose: (x, z, h, fly) => {
@@ -588,6 +847,10 @@ async function boot() {
         project: (key) => {
           document.querySelectorAll(".card").forEach((c) => c.classList.toggle("is-playing", (c as HTMLElement).dataset.key === key));
         },
+        hover: (info) => showCard(info),
+        tasks: () => refreshActions(),
+        pddl: (v) => showPddl(v),
+        view: (v) => viewChanged(v),
       },
     );
   } catch (err) {
@@ -597,9 +860,14 @@ async function boot() {
     return;
   }
   root.classList.add("maze-ready");
+  refreshActions();
   api.setPref(Number(pref.value) / 100);
   if (kind !== "hybrid") api.setKind(kind);
   if (!costOn) api.costmap(false);
+  if (!sensorsOn.lidar) api.sensor("lidar", false);
+  if (sensorsOn.detect) api.sensor("detect", true);
+  if (feedNow !== "off") api.feed(feedNow);
+  if (viewNow !== "top") api.setView(viewNow);
   if (!isMaze()) api.pause(true);
   hint.classList.add("show");
   hintTimer = window.setTimeout(hideHint, 9000);
