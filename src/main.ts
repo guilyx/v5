@@ -173,7 +173,7 @@ function paintMapBase() {
   k.fillStyle = "#f8f3e9";
   k.fillRect(0, 0, W, H);
   ROOMS.forEach((r) => {
-    k.fillStyle = r.id === "hiventive" ? "#4a4c53" : r.tint;
+    k.fillStyle = r.dark ? "#4a4c53" : r.tint;
     k.fillRect(r.x - 0.5, r.y - 0.5, r.w + 1, r.h + 1);
   });
   const runs = wallRuns(W, H, (x, y) => x >= 0 && y >= 0 && x < W && y < H && maze.grid[idx(x, y)] === WALL, () => 0, 0.5);
@@ -184,7 +184,7 @@ function paintMapBase() {
   ROOMS.forEach((r, i) => {
     if (!i) return;
     k.font = `700 ${11 / mmScale}px "Geist Variable", system-ui, sans-serif`;
-    k.fillStyle = r.id === "hiventive" ? "#f0d28c" : r.ink;
+    k.fillStyle = r.ink;
     k.fillText(String(i).padStart(2, "0"), r.x + r.w / 2, r.y + r.h / 2);
   });
   // room buttons over the map, for keyboard and screen readers too
@@ -803,7 +803,7 @@ async function boot() {
     document.fonts.load('600 100px "Geist Variable"'),
   ]).catch(() => {});
   const { startMaze } = await import("./maze/world");
-  const linked = /^#room-(\w+)/.exec(location.hash);
+  const linked = /^#room-([\w-]+)/.exec(location.hash);
   const startRoom = Math.max(0, linked ? ROOMS.findIndex((r) => r.id === linked[1]) : 0);
   const canvas = document.getElementById("maze") as HTMLCanvasElement;
   try {

@@ -8,7 +8,7 @@
  */
 
 export const W = 57;
-export const H = 43;
+export const H = 57;
 
 export const FLOOR = 0;
 export const WALL = 1;
@@ -37,9 +37,12 @@ export interface RoomDef {
   label: [number, number];
   /** short name for the minimap */
   short: string;
+  /** a dark floor: the map draws it lighter, with a light label */
+  dark?: boolean;
 }
 
-// Chronological. Odd x/y and odd sizes so every room sits on the corridor lattice.
+// Chronological, snaking: left to right, then back, four rows. Odd x/y and odd sizes so every room
+// sits on the corridor lattice.
 export const ROOMS: RoomDef[] = [
   {
     id: "start", name: "Erwin Lejeune", short: "Start", sub: "HEAD OF ROBOTICS", x: 3, y: 3, w: 9, h: 7,
@@ -52,7 +55,7 @@ export const ROOMS: RoomDef[] = [
   },
   {
     id: "hiventive", name: "Hiventive", short: "Hiventive", sub: "2018–2019 · BORDEAUX", x: 29, y: 3, w: 9, h: 9,
-    tint: "#2d2f35", ink: "#f0d28c", anchor: [4, 6], label: [0.5, 8.1],
+    tint: "#2d2f35", ink: "#f0d28c", anchor: [4, 6], label: [0.5, 8.1], dark: true,
   },
   {
     id: "coimbra", name: "Coimbra", short: "Coimbra", sub: "2019 · TWO MAZES, TWO WINS", x: 43, y: 3, w: 11, h: 11,
@@ -70,29 +73,50 @@ export const ROOMS: RoomDef[] = [
     tint: "#d3ead2", ink: "#2f6b3a", anchor: [3, 5], label: [0.5, 10.1],
     blocks: [[2, 2, 7, 1], [2, 7, 7, 1], [6, 5, 1, 1]],
   },
+  // TII: four rooms, one per thing I built there
   {
-    id: "tii", name: "TII", short: "TII", sub: "2022–2026 · ABU DHABI", x: 15, y: 17, w: 11, h: 11,
-    tint: "#f6d3c6", ink: "#9a3f22", anchor: [5, 5], label: [0.5, 10.1],
+    id: "tii-c2", name: "Command & Control", short: "TII · C2", sub: "TII · 2022–2026 · ABU DHABI", x: 15, y: 17, w: 11, h: 11,
+    tint: "#2b3138", ink: "#ffb49c", anchor: [5, 7], label: [0.5, 10.1], dark: true,
+    // the ops table in the middle, the wall of screens up north
+    blocks: [[4, 3, 3, 2], [1, 0, 9, 1]],
   },
   {
-    id: "unchained", name: "Unchained Labs", short: "Unchained", sub: "2024– · FOUNDER", x: 3, y: 19, w: 7, h: 7,
+    id: "tii-swarm", name: "Swarm Control", short: "TII · Swarm", sub: "TII · DECENTRALIZED FLOCKING", x: 3, y: 17, w: 9, h: 11,
+    tint: "#f6d3c6", ink: "#9a3f22", anchor: [4, 8], label: [0.5, 10.1],
+    blocks: [[2, 6, 1, 1], [6, 4, 1, 1]],
+  },
+  {
+    id: "tii-bt", name: "Orchestration", short: "TII · BTs", sub: "TII · MULTI-ROBOT BEHAVIOR TREES", x: 3, y: 31, w: 11, h: 11,
+    tint: "#efe0cf", ink: "#8a4a2b", anchor: [5, 6], label: [0.5, 10.1],
+    // the tree on the north wall, and the charging docks
+    blocks: [[0, 0, 11, 1]],
+  },
+  {
+    id: "tii-track", name: "Plan & Track", short: "TII · M4", sub: "TII × CALTECH · M4 OUTDOORS", x: 17, y: 31, w: 13, h: 11,
+    tint: "#e6dcc0", ink: "#6b5320", anchor: [1, 9], label: [0.5, 10.1],
+    blocks: [[0, 0, 13, 1]],
+  },
+  {
+    id: "unchained", name: "Unchained Labs", short: "Unchained", sub: "2024– · FOUNDER", x: 33, y: 33, w: 7, h: 7,
     tint: "#d6e6f5", ink: "#2c5687", anchor: [1, 4], label: [0.4, 6.1],
   },
   {
-    id: "sirb", name: "SIRB.AI", short: "SIRB.AI", sub: "2026– · HEAD OF ROBOTICS", x: 3, y: 31, w: 9, h: 9,
-    tint: "#f2e2b8", ink: "#7a5a12", anchor: [4, 5], label: [0.5, 8.1],
+    id: "sirb", name: "SIRB.AI", short: "SIRB.AI", sub: "2026– · HEAD OF ROBOTICS", x: 43, y: 31, w: 11, h: 11,
+    tint: "#f2e2b8", ink: "#7a5a12", anchor: [5, 6], label: [0.5, 10.1],
+    // the agent's console on the north wall
+    blocks: [[3, 0, 5, 1]],
   },
   {
-    id: "projects", name: "Projects", short: "Projects", sub: "THINGS I BUILT", x: 17, y: 31, w: 13, h: 9,
+    id: "projects", name: "Projects", short: "Projects", sub: "THINGS I BUILT", x: 41, y: 45, w: 13, h: 9,
     tint: "#e4dcf0", ink: "#55407f", anchor: [6, 6], label: [0.5, 8.1],
     blocks: [[0, 0, 13, 1], [1, 4, 2, 1], [4, 4, 2, 1], [7, 4, 2, 1], [10, 4, 2, 1]],
   },
   {
-    id: "photos", name: "Off the clock", short: "Photos", sub: "PHOTOGRAPHS", x: 35, y: 31, w: 9, h: 9,
+    id: "photos", name: "Off the clock", short: "Photos", sub: "PHOTOGRAPHS", x: 27, y: 45, w: 9, h: 9,
     tint: "#f6dbe0", ink: "#93364c", anchor: [4, 4], label: [0.5, 8.1],
   },
   {
-    id: "exit", name: "Exit", short: "Exit", sub: "SAY HELLO", x: 49, y: 31, w: 5, h: 9,
+    id: "exit", name: "Exit", short: "Exit", sub: "SAY HELLO", x: 9, y: 45, w: 5, h: 9,
     tint: "#d4ead8", ink: "#2c6a45", anchor: [2, 4], label: [0.4, 8.1],
     blocks: [[3, 1, 1, 1]],
   },
@@ -223,9 +247,15 @@ export function buildMaze(seed = SEED): Maze {
   const s = ROOMS[0];
   const gaps: [number, number][] = [[0, s.y + 2]];
   for (let x = 0; x < s.x; x++) grid[idx(x, s.y + 2)] = FLOOR;
+  // out through whichever side of the frame the exit is nearer
   const e = ROOMS[ROOMS.length - 1];
-  gaps.push([W - 1, e.y + 4]);
-  for (let x = e.x + e.w; x < W; x++) grid[idx(x, e.y + 4)] = FLOOR;
+  if (e.x + e.w / 2 < W / 2) {
+    gaps.push([0, e.y + 4]);
+    for (let x = 0; x < e.x; x++) grid[idx(x, e.y + 4)] = FLOOR;
+  } else {
+    gaps.push([W - 1, e.y + 4]);
+    for (let x = e.x + e.w; x < W; x++) grid[idx(x, e.y + 4)] = FLOOR;
+  }
 
   const anchors = ROOMS.map((r) => [r.x + r.anchor[0], r.y + r.anchor[1]] as [number, number]);
   return { grid, roomOf, ringOf, start: anchors[0], anchors, gaps };

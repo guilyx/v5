@@ -1,13 +1,16 @@
 import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
-import { FLOOR, H, type Maze, ROOMS, type RoomDef, W, idx, rng, wallRuns } from "./layout";
+import { FLOOR, type Maze, ROOMS, type RoomDef, idx, rng, wallRuns } from "./layout";
 import { Atlas, SANS, SERIF, fitText, quad, roundRect, spaced, spacedWidth, wrap } from "./paint";
-import { PAL, blobTexture, clay, plain, tint } from "./gfx";
+import { PAL, blobTexture, clay } from "./gfx";
+import { Kit, PX, cellAt, detOf, glow, gx, gz, hitBox, instanceBoxes, paintWord, wallScreen } from "./kit";
 import { buildRobot } from "./robot";
-import { type Cell, planAll } from "./mapf";
 import { PHOTOS, PROJECTS } from "../media";
 import { BlocksTable } from "./blocks";
 import { RANGE, SHORT, SwarmNet } from "./swarm";
+
+type Cell = [number, number];
+import { c2, orchestration, planTrack, swarmControl } from "./tii";
 
 /**
  * The rooms. Each chapter gets a few props built from primitives, merged so a room costs one
@@ -101,7 +104,7 @@ export interface Fx {
   table?: BlocksTable;
   trolley?: Trolley;
   /** animate; return true while it still needs frames */
-  update?(now: number, dt: number, inside: boolean): boolean;
+  update?(now: number, dt: number, inside: boolean, near: boolean): boolean;
   /** clickable meshes, with a handler */
   pick?: { object: THREE.Object3D; hit: (face: number) => void }[];
   /** called once when the robot first gets close: load the heavier media */
@@ -110,75 +113,8 @@ export interface Fx {
   sleep?(): void;
 }
 
-const gx = (x: number) => x - W / 2;
-const gz = (z: number) => z - H / 2;
-const cellAt = (r: RoomDef, rx: number, ry: number): [number, number] => [gx(r.x + rx + 0.5), gz(r.y + ry + 0.5)];
-
-/** collects tinted primitives and merges them into one mesh */
-class Kit {
-  parts: THREE.BufferGeometry[] = [];
-  add(g: THREE.BufferGeometry, color: THREE.ColorRepresentation) {
-    this.parts.push(tint(plain(g), color));
-    return this;
-  }
-  box(w: number, h: number, d: number, x: number, y: number, z: number, color: THREE.ColorRepresentation, ry = 0) {
-    const g = new THREE.BoxGeometry(w, h, d);
-    if (ry) g.rotateY(ry);
-    g.translate(x, y, z);
-    return this.add(g, color);
-  }
-  cyl(rt: number, rb: number, h: number, x: number, y: number, z: number, color: THREE.ColorRepresentation, seg = 18, rot?: [number, number, number]) {
-    const g = new THREE.CylinderGeometry(rt, rb, h, seg);
-    if (rot) {
-      g.rotateX(rot[0]);
-      g.rotateY(rot[1]);
-      g.rotateZ(rot[2]);
-    }
-    g.translate(x, y, z);
-    return this.add(g, color);
-  }
-  mesh(opts: { emissive?: number } = {}) {
-    const m = new THREE.Mesh(mergeGeometries(this.parts), clay({ vertexColors: true, emissive: opts.emissive }));
-    return m;
-  }
-}
-
-/** brighten an object's clay materials while it's pointed at */
-function glow(objs: THREE.Object3D[]) {
-  const mats: { m: THREE.ShaderMaterial; base: number }[] = [];
-  for (const o of objs)
-    o.traverse((c) => {
-      const m = (c as THREE.Mesh).material as THREE.ShaderMaterial | undefined;
-      if (m && m.uniforms?.uEmissive && !mats.some((x) => x.m === m)) mats.push({ m, base: m.uniforms.uEmissive.value });
-    });
-  return (on: boolean) => {
-    for (const { m, base } of mats) m.uniforms.uEmissive.value = on ? Math.min(1, base + 0.3) : base;
-  };
-}
-
-const detOf = (key: string, cls: string, label = cls): Det => ({ key, cls, label, box: new THREE.Box3() });
-/** boxes of an instanced mesh's instances, from its geometry's bounds */
-function instanceBoxes(mesh: THREE.InstancedMesh, dets: Det[], grow = 0) {
-  const geo = mesh.geometry;
-  if (!geo.boundingBox) geo.computeBoundingBox();
-  const m = new THREE.Matrix4();
-  dets.forEach((d, i) => {
-    mesh.getMatrixAt(i, m);
-    d.box.copy(geo.boundingBox!).applyMatrix4(m).expandByScalar(grow);
-  });
-}
-
-/** an invisible box that only the hover ray sees (the ray doesn't skip hidden meshes) */
-function hitBox(w: number, h: number, d: number, x: number, y: number, z: number) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial());
-  m.position.set(x, y, z);
-  m.visible = false;
-  return m;
-}
-
 /* ============================================================== floor lettering for every room */
 
-const PX = 112; // atlas pixels per world unit
 
 function paintLabel(ctx: Ctx, r: RoomDef) {
   const c = ctx.atlas.ctx;
@@ -212,50 +148,6 @@ function paintLabel(ctx: Ctx, r: RoomDef) {
       const cx = r.id === "start" ? gx(r.x + r.label[0]) + ww / 2 : gx(r.x + r.w - r.label[0]) - ww / 2;
       ctx.decals.push(quad(cx, 0.004, gz(r.y + r.label[1]), ww, hh, uv));
     },
-  );
-}
-
-/** a small painted word on the floor */
-function paintWord(ctx: Ctx, text: string, color: string, x: number, z: number, px = 34, tracking = 5) {
-  const c = ctx.atlas.ctx;
-  c.font = `700 ${px}px ${SANS}`;
-  const w = spacedWidth(c, text, tracking) + 12;
-  const h = px * 1.3;
-  ctx.atlas.queue(
-    w,
-    h,
-    (k) => {
-      k.font = `700 ${px}px ${SANS}`;
-      k.fillStyle = color;
-      k.textBaseline = "middle";
-      spaced(k, text, 6, h / 2 + 1, tracking);
-    },
-    (uv) => ctx.decals.push(quad(x, 0.005, z, w / PX, h / PX, uv)),
-  );
-}
-
-/** a big number with a caption, painted like a floor marking */
-function paintStat(ctx: Ctx, big: string, small: string, color: string, x: number, z: number) {
-  const c = ctx.atlas.ctx;
-  c.font = `italic 400 92px ${SERIF}`;
-  const bw = c.measureText(big).width;
-  c.font = `700 22px ${SANS}`;
-  const sw = spacedWidth(c, small, 4);
-  const w = Math.max(bw, sw) + 20;
-  const h = 128;
-  ctx.atlas.queue(
-    w,
-    h,
-    (k) => {
-      k.fillStyle = color;
-      k.globalAlpha = 0.85;
-      k.textAlign = "left";
-      k.font = `italic 400 92px ${SERIF}`;
-      k.fillText(big, (w - bw) / 2, 78);
-      k.font = `700 22px ${SANS}`;
-      spaced(k, small, (w - sw) / 2, 112, 4);
-    },
-    (uv) => ctx.decals.push(quad(x, 0.005, z, w / PX, h / PX, uv)),
   );
 }
 
@@ -1093,217 +985,6 @@ function coalescent(ctx: Ctx, r: RoomDef): Fx {
   };
 }
 
-/* ============================================================== 06 · TII, the swarm room */
-
-function tii(ctx: Ctx, r: RoomDef): Fx {
-  const g = new THREE.Group();
-  const m = ctx.maze;
-  const N = 6;
-  const colors = ["#3a9d8f", "#e2a93c", "#9a5fb4", "#4b8fd6", "#e06f8b", "#69a84f"];
-
-  // a smaller robot body, instanced
-  const k = new Kit();
-  k.cyl(0.2, 0.2, 0.15, 0, 0.13, 0, "#ffffff", 20);
-  k.cyl(0.16, 0.2, 0.05, 0, 0.23, 0, "#ffffff", 20);
-  const visor = new THREE.CylinderGeometry(0.203, 0.203, 0.07, 16, 1, true, -0.6, 1.2);
-  visor.rotateY(Math.PI / 2);
-  visor.translate(0, 0.15, 0);
-  k.add(visor, "#3a3840");
-  k.cyl(0.055, 0.055, 0.06, 0, 0.28, 0, "#3a3840", 12);
-  for (const s of [-1, 1]) k.cyl(0.065, 0.065, 0.04, 0.02, 0.065, s * 0.2, "#3a3840", 12, [Math.PI / 2, 0, 0]);
-  const bodyGeo = mergeGeometries(k.parts);
-  bodyGeo.scale(1.3, 1.3, 1.3);
-  const agents = new THREE.InstancedMesh(bodyGeo, clay({ vertexColors: true }), N);
-  colors.forEach((c, i) => agents.setColorAt(i, new THREE.Color(c)));
-  g.add(agents);
-  const shadows = new THREE.InstancedMesh(
-    new THREE.PlaneGeometry(0.95, 0.95).rotateX(-Math.PI / 2),
-    new THREE.MeshBasicMaterial({ map: blobTexture(), transparent: true, depthWrite: false }),
-    N,
-  );
-  shadows.renderOrder = 1;
-  g.add(shadows);
-  // the numbers of this chapter, painted on the floor
-  paintStat(ctx, "−74%", "ONBOARD CPU", r.ink, ...cellAt(r, 1.6, 0.55));
-  paintStat(ctx, "−52%", "NETWORK BANDWIDTH", r.ink, ...cellAt(r, 8.4, 0.55));
-  paintStat(ctx, "9", "ENGINEERS", r.ink, ...cellAt(r, 1.0, 8.6));
-
-  // their planned paths, as dots in each agent's colour
-  const MAXD = 260;
-  const dots = new THREE.InstancedMesh(new THREE.CircleGeometry(0.07, 12).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial(), MAXD);
-  // colours must exist before the first draw, or the shader is built without them
-  for (let i = 0; i < MAXD; i++) dots.setColorAt(i, new THREE.Color(colors[i % N]));
-  dots.count = 0;
-  dots.frustumCulled = false;
-  g.add(dots);
-  const dotMeta: { agent: number; t: number }[] = [];
-
-  const inRoom = (x: number, y: number) => x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h && m.grid[idx(x, y)] === FLOOR;
-  const pos: Cell[] = [];
-  for (let i = 0; i < N; i++) pos.push([r.x + 2 + (i % 3) * 3, r.y + 2 + Math.floor(i / 3) * 6]);
-  const heading = new Float32Array(N);
-  let paths: Cell[][] = pos.map((p) => [p]);
-  let t0 = 0;
-  let round = 0;
-  let waitUntil = 0;
-  const STEP = 0.34;
-  const SHOW = 0.75; // the plans are drawn first, then everyone moves
-  const ring: Cell[] = [[3, 0], [2, 2], [0, 3], [-2, 2], [-3, 0], [-2, -2], [0, -3], [2, -2]];
-
-  const replan = (now: number) => {
-    const [rx, ry] = [Math.floor(ctx.robot.x + W / 2), Math.floor(ctx.robot.z + H / 2)];
-    const insideRoom = rx >= r.x && ry >= r.y && rx < r.x + r.w && ry < r.y + r.h;
-    const cx = insideRoom ? rx : r.x + Math.floor(r.w / 2);
-    const cy = insideRoom ? ry : r.y + Math.floor(r.h / 2);
-    const taken = new Set<string>();
-    const goals: Cell[] = [];
-    for (let i = 0; i < N; i++) {
-      const [dx, dy] = ring[(i + round) % ring.length];
-      let best: Cell = pos[i];
-      let bd = Infinity;
-      for (let y = r.y; y < r.y + r.h; y++)
-        for (let x = r.x; x < r.x + r.w; x++) {
-          if (!inRoom(x, y) || taken.has(`${x},${y}`) || (Math.abs(x - cx) <= 1 && Math.abs(y - cy) <= 1)) continue;
-          const d = (x - cx - dx) ** 2 + (y - cy - dy) ** 2;
-          if (d < bd) {
-            bd = d;
-            best = [x, y];
-          }
-        }
-      taken.add(`${best[0]},${best[1]}`);
-      goals.push(best);
-    }
-    const blocked = new Set<string>();
-    if (insideRoom) for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if (!dx || !dy) blocked.add(`${rx + dx},${ry + dy}`);
-    paths = planAll(inRoom, pos.map((p) => [p[0], p[1]] as Cell), goals, blocked, 40);
-    t0 = now + SHOW;
-    round++;
-    // draw the plans
-    dotMeta.length = 0;
-    let n = 0;
-    const mt = new THREE.Matrix4();
-    const col = new THREE.Color();
-    paths.forEach((p, a) => {
-      for (let t = 1; t < p.length && n < MAXD; t++) {
-        for (const f of [0.5, 1]) {
-          const x = p[t - 1][0] + (p[t][0] - p[t - 1][0]) * f;
-          const y = p[t - 1][1] + (p[t][1] - p[t - 1][1]) * f;
-          if (f === 0.5 && p[t][0] === p[t - 1][0] && p[t][1] === p[t - 1][1]) continue;
-          mt.makeTranslation(gx(x + 0.5), 0.011, gz(y + 0.5));
-          dots.setMatrixAt(n, mt);
-          dots.setColorAt(n, col.set(colors[a]));
-          dotMeta.push({ agent: a, t: t - 1 + f });
-          n++;
-        }
-      }
-    });
-    dots.count = n;
-    dots.instanceMatrix.needsUpdate = true;
-    if (dots.instanceColor) dots.instanceColor.needsUpdate = true;
-  };
-
-  const mt = new THREE.Matrix4();
-  const q = new THREE.Quaternion();
-  const up = new THREE.Vector3(0, 1, 0);
-  const one = new THREE.Vector3(1, 1, 1);
-  const p3 = new THREE.Vector3();
-  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
-  const place = (now: number, dt: number) => {
-    const tt = Math.max(0, (now - t0) / STEP);
-    for (let a = 0; a < N; a++) {
-      const p = paths[a];
-      const i = Math.min(p.length - 1, Math.floor(tt));
-      const j = Math.min(p.length - 1, i + 1);
-      let f = Math.min(1, tt - i);
-      f = f * f * (3 - 2 * f);
-      const x = p[i][0] + (p[j][0] - p[i][0]) * f;
-      const y = p[i][1] + (p[j][1] - p[i][1]) * f;
-      if (p[j][0] !== p[i][0] || p[j][1] !== p[i][1]) {
-        const want = Math.atan2(p[j][1] - p[i][1], p[j][0] - p[i][0]);
-        let d = want - heading[a];
-        d = Math.atan2(Math.sin(d), Math.cos(d));
-        heading[a] += d * Math.min(1, dt * 14);
-      }
-      p3.set(gx(x + 0.5), 0, gz(y + 0.5));
-      q.setFromAxisAngle(up, -heading[a]);
-      mt.compose(p3, q, one);
-      agents.setMatrixAt(a, mt);
-      mt.makeTranslation(p3.x + 0.03, 0.004, p3.z + 0.04);
-      shadows.setMatrixAt(a, mt);
-      pos[a] = p[Math.min(p.length - 1, Math.round(tt))];
-    }
-    agents.instanceMatrix.needsUpdate = true;
-    agents.computeBoundingSphere();
-    shadows.instanceMatrix.needsUpdate = true;
-    // dots the agents have passed disappear
-    const mtd = new THREE.Matrix4();
-    dotMeta.forEach((d, n) => {
-      if (d.t < tt - 0.2) dots.setMatrixAt(n, zero);
-      else {
-        const p = paths[d.agent];
-        const i = Math.floor(d.t);
-        const f = d.t - i;
-        const a0 = p[i];
-        const a1 = p[Math.min(p.length - 1, i + 1)];
-        mtd.makeTranslation(gx(a0[0] + (a1[0] - a0[0]) * f + 0.5), 0.011, gz(a0[1] + (a1[1] - a0[1]) * f + 0.5));
-        dots.setMatrixAt(n, mtd);
-      }
-    });
-    dots.instanceMatrix.needsUpdate = true;
-    return tt;
-  };
-  place(0, 0);
-  const ix: Interactable[] = [
-    {
-      id: "mapf",
-      room: 6,
-      name: "MAPF swarm",
-      kind: "passive",
-      blurb: "Six robots plan around you with prioritized space-time A*: each reserves its cells in time so nobody collides. Drive in and they ring you.",
-      targets: [agents],
-      anchor: () => {
-        const c = new THREE.Vector3(gx(r.x + r.w / 2), 1.1, gz(r.y + r.h / 2));
-        return c;
-      },
-      highlight: glow([agents]),
-    },
-  ];
-
-  const agentDets = colors.map((_, i) => detOf(`agent-${i}`, "robot"));
-  return {
-    room: 6,
-    group: g,
-    ix,
-    detect(out) {
-      instanceBoxes(agents, agentDets);
-      out.push(...agentDets);
-    },
-    update(now, dt, inside) {
-      if (ctx.reduced) {
-        if (inside && round === 0) {
-          replan(now);
-          t0 = now - 100;
-          place(now, 1);
-          return true;
-        }
-        return false;
-      }
-      const longest = Math.max(...paths.map((p) => p.length));
-      const tt = place(now, dt);
-      if (tt > longest) {
-        if (!waitUntil) waitUntil = now + 0.5;
-        if (now > waitUntil && inside) {
-          waitUntil = 0;
-          // everyone at the goal: snap and plan the next lap around the robot
-          paths.forEach((p, a) => (pos[a] = p[p.length - 1]));
-          replan(now);
-        }
-      }
-      return inside || tt <= longest + 0.5;
-    },
-  };
-}
-
 /* ============================================================== 07 · Unchained Labs, agents at home */
 
 function unchained(ctx: Ctx, r: RoomDef): Fx {
@@ -1624,6 +1305,60 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
     n = Math.max(1, n);
     return new THREE.Vector3(x / n, y / n, z / n);
   };
+  // the self-healing layer: an agent reads the swarm's telemetry, says what it sees, works out why, and acts
+  type Entry = { t: number; kind: "!" | "?" | ">" | "ok"; text: string };
+  const agentLog: Entry[] = [];
+  const agentSay = (kind: Entry["kind"], text: string) => {
+    agentLog.push({ t: clock, kind, text });
+    if (agentLog.length > 9) agentLog.shift();
+  };
+  let healing: { since: number; what: "mesh" | "fail" | "range" | "revive" } | null = null;
+  let jamNoted = false;
+  let dropout = -1;
+  const uav = (i: number) => `UAV-${String(i + 1).padStart(2, "0")}`;
+  const screen = wallScreen(5.4, 2.1, 1400, 544, 0.24);
+  screen.stand(gx(r.x + 5.5), 0.15, gz(r.y) + 0.75);
+  g.add(screen.group);
+  const readiness = () =>
+    THREE.MathUtils.clamp(0.45 * (net.count / N) + 0.35 * Math.min(1, net.lambda2 / 1.5) + 0.2 * (net.groups === 1 ? 1 : 0) - (net.jam ? 0.1 : 0), 0, 1);
+  const drawConsole = () => {
+    const k = screen.k;
+    k.fillStyle = "#15171b";
+    k.fillRect(0, 0, screen.cw, screen.ch);
+    k.fillStyle = "#f2d27a";
+    k.font = `700 30px ${SANS}`;
+    k.fillText("SELF-HEALING AGENT", 32, 52);
+    const rd = readiness();
+    const go = rd >= 0.75;
+    k.textAlign = "right";
+    k.fillStyle = go ? "#7fd18a" : "#ff8a65";
+    k.font = `700 30px ${SANS}`;
+    k.fillText(`MISSION READINESS ${rd.toFixed(2)} · ${go ? "GO" : "HOLD"}`, screen.cw - 32, 52);
+    k.textAlign = "left";
+    const tags: Record<Entry["kind"], [string, string]> = {
+      "!": ["▲", "#ff6b5a"],
+      "?": ["⋯", "#f0b04a"],
+      ">": ["→", "#7aa7ff"],
+      ok: ["✓", "#7fd18a"],
+    };
+    agentLog.forEach((e, i) => {
+      const y = 108 + i * 48;
+      k.font = `500 23px ui-monospace, Menlo, monospace`;
+      k.fillStyle = "#6c7884";
+      const s0 = Math.floor(e.t);
+      k.fillText(`${String(Math.floor(s0 / 60) % 60).padStart(2, "0")}:${String(s0 % 60).padStart(2, "0")}`, 32, y);
+      k.fillStyle = tags[e.kind][1];
+      k.font = `700 26px ${SANS}`;
+      k.fillText(tags[e.kind][0], 130, y);
+      k.fillStyle = i === agentLog.length - 1 ? "#f3f5f7" : "#c6ccd3";
+      k.font = `${e.kind === "!" ? 650 : 500} 25px ${SANS}`;
+      k.fillText(e.text, 170, y);
+    });
+    screen.flush();
+  };
+  agentSay(">", "watching 30 drones: heartbeats, links, motors, batteries");
+  let drawAt = -1;
+
   const ix: Interactable[] = [
     {
       id: "flock",
@@ -1652,11 +1387,29 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
             if (d > Math.hypot(fx - c.x, fz - c.z)) [fx, fz] = [pos[i * 3], pos[i * 3 + 2]];
           }
           net.jam = { x: c.x + (fx - c.x) * 0.75, y: c.y, z: c.z + (fz - c.z) * 0.75, r: 1.0, until: clock + 8 };
+          jamNoted = false;
         } else if (action === "fail") {
           const h = net.hub();
-          if (h >= 0) net.alive[h] = 0;
-        } else if (action === "range") net.target = net.target === SHORT ? RANGE : SHORT;
-        else if (action === "revive") net.alive.fill(1);
+          if (h >= 0) {
+            net.alive[h] = 0;
+            agentSay("!", `${uav(h)} losing altitude, motor 3 current spike`);
+            agentSay("?", "a motor failure, not the link: it was the best-connected drone");
+            agentSay(">", "clear its landing zone, give its slot to the others, flag it for inspection");
+            healing = { since: clock, what: "fail" };
+          }
+        } else if (action === "range") {
+          net.target = net.target === SHORT ? RANGE : SHORT;
+          if (net.target === SHORT) {
+            agentSay("!", "link margins down across the swarm");
+            agentSay("?", "the radio range has dropped: interference, or terrain");
+            agentSay(">", "tighten the formation so neighbours stay in reach");
+          } else agentSay(">", "range back: open the formation up again");
+          healing = { since: clock, what: "range" };
+        } else if (action === "revive") {
+          agentSay(">", `operator: ${N - net.count} drones back in service, re-slotting them`);
+          net.alive.fill(1);
+          healing = { since: clock, what: "revive" };
+        }
         ctx.kick();
       },
     },
@@ -1682,22 +1435,69 @@ function sirb(ctx: Ctx, r: RoomDef): Fx {
       const ok = net.groups === 1 && !lost;
       return { at: centroid().add(new THREE.Vector3(0, 1.1, 0)), title: "Swarm network", lines, color: ok ? "#2f8f5b" : "#e8850f" };
     },
-    update(now, dt, inside) {
+    update(now, dt, inside, near) {
       clock = now;
       if (ctx.reduced) {
         net.update(pos, now, dt);
         place(now);
+        if (near && now - drawAt > 0.5) {
+          drawAt = now;
+          drawConsole();
+        }
         return false;
       }
       lead += ((inside ? 1 : 0) - lead) * Math.min(1, dt * 1.6);
-      // every few seconds one drone's radio drops out: it dips, the layer recovers it
-      if (now - faultAt > 4.5) {
+      // now and then one drone's radio drops out: it dips, the agent notices and the layer recovers it
+      if (now - faultAt > 9) {
         if (fault >= 0) net.radioDown[fault] = 0;
         fault = Math.floor((now * 7.3) % N);
         faultAt = now;
+        if (net.alive[fault]) {
+          dropout = fault;
+          agentSay("!", `${uav(fault)} heartbeat lost`);
+          agentSay("?", "IMU and motors nominal: a radio dropout");
+          agentSay(">", "hold its position, retry the link");
+        }
       }
       net.radioDown[fault] = net.alive[fault] && now - faultAt < 1.6 ? 1 : 0;
+      if (dropout >= 0 && !net.radioDown[dropout]) {
+        agentSay("ok", `${uav(dropout)} back on the mesh in 1.6 s`);
+        dropout = -1;
+      }
       net.update(pos, now, dt);
+      // the agent's reading of the network
+      if (net.jam && !jamNoted) {
+        const lost = net.lost.reduce((s, v) => s + v, 0);
+        if (lost > 0) {
+          jamNoted = true;
+          agentSay("!", `${lost} drones lost the mesh at once, all in one place`);
+          agentSay("?", "wideband noise on the link: jamming");
+          agentSay(">", "send the cut-off drones back toward the group; request a channel hop");
+          healing = { since: now, what: "mesh" };
+        }
+      }
+      if (healing && now - healing.since > 1.2) {
+        const lost = net.lost.reduce((s, v) => s + v, 0);
+        const settled = Math.abs(net.range - net.target) < 0.02;
+        const took = (now - healing.since).toFixed(1);
+        if (healing.what === "mesh" && net.groups === 1 && !lost) {
+          agentSay("ok", `mesh whole again in ${took} s, λ₂ ${net.lambda2.toFixed(2)}`);
+          healing = null;
+        } else if (healing.what === "fail" && net.groups === 1) {
+          agentSay("ok", `formation closed up: ${net.count} flying, one group`);
+          healing = null;
+        } else if (healing.what === "range" && settled) {
+          agentSay("ok", `formation at ${Math.round(net.spread * 100)}%, ${net.groups === 1 ? "still one group" : `${net.groups} groups`}`);
+          healing = null;
+        } else if (healing.what === "revive" && now - healing.since > 2.5) {
+          agentSay("ok", `all ${N} flying, λ₂ ${net.lambda2.toFixed(2)}`);
+          healing = null;
+        }
+      }
+      if (near && now - drawAt > 0.33) {
+        drawAt = now;
+        drawConsole();
+      }
       // small fixed steps keep the flock stable on a slow frame
       let left = Math.min(dt, 0.1);
       while (left > 1e-4) {
@@ -2025,7 +1825,10 @@ const BUILDERS: Record<string, (ctx: Ctx, r: RoomDef) => Fx> = {
   coimbra,
   centrale,
   coalescent,
-  tii,
+  "tii-c2": c2,
+  "tii-swarm": swarmControl,
+  "tii-bt": orchestration,
+  "tii-track": planTrack,
   unchained,
   sirb,
   projects,
@@ -2034,8 +1837,12 @@ const BUILDERS: Record<string, (ctx: Ctx, r: RoomDef) => Fx> = {
 };
 
 export function buildRooms(ctx: Ctx): Fx[] {
-  return ROOMS.map((r) => {
+  return ROOMS.map((r, i) => {
     paintLabel(ctx, r);
-    return BUILDERS[r.id](ctx, r);
+    // rooms are known by id; their index (and their objects') comes from the layout
+    const fx = BUILDERS[r.id](ctx, r);
+    fx.room = i;
+    for (const x of fx.ix ?? []) x.room = i;
+    return fx;
   });
 }

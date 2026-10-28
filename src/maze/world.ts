@@ -476,10 +476,8 @@ export function startMaze(
   function drawOverlay(now: number) {
     const fanOn = view !== "fpv" && (sensors.detect || feedMode !== "off");
     // rooms with a live readout (the swarm's network), while the camera is near them
-    const huds = hudRooms.filter((f) => {
-      const [rx, rz] = roomCenter[f.room];
-      return (rx - camera.position.x) ** 2 + (rz - camera.position.z) ** 2 < 26 * 26;
-    });
+    // a room's live readout shows while the robot is in it
+    const huds = hudRooms.filter((f) => f.room === current);
     const need = sensors.detect || view === "fpv" || fanOn || tasks.fx.active || huds.length > 0;
     if (!need && !overlayDirty) return;
     const k = octx;
@@ -1162,7 +1160,8 @@ export function startMaze(
         f.approach();
       }
       if (f.update && d2 < 22 * 22 && awake) {
-        if (f.update(now, dt, current === f.room && r === f.room)) busy = true;
+        // near: close enough to the view that its screens are worth redrawing
+        if (f.update(now, dt, current === f.room && r === f.room, d2 < 11 * 11)) busy = true;
       }
     }
 

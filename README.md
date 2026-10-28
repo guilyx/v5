@@ -57,12 +57,15 @@ before the robot sets off. Every room is a chapter of his career, and walking
 | 03 | Coimbra | A small maze on a table that a small robot keeps solving, and two trophies: mapped, unmapped |
 | 04 | Centrale Nantes | The two papers on easels, an inverted pendulum balancing, and a blocks-world table: a PDDL planner, and M4's arm carries out the plan |
 | 05 | Coalescent | Supermarket aisles and a trolley that gets a detection box when you walk in; M4 can dock to it and push it to the checkout |
-| 06 | TII | Six robots plan around you with prioritized space-time A* (a PyMAPF nod); −74% CPU and −52% bandwidth painted on the floor |
-| 07 | Unchained Labs | An intent → agents → jobs graph with pulses running along it |
-| 08 | SIRB.AI | A flock of drones that forms up around M4 and follows it, rolling or flying; now and then one fails, drops, and recovers |
-| 09 | Projects | The eight project clips on screens; the one you stand at plays |
-| 10 | Off the clock | His photos, printed and scattered on the floor (click one) |
-| 11 | Exit | A finish line, a mailbox, and how to reach him |
+| 06 | TII · Command & Control | An ops table that maps the room live, a video wall (units, mission log, the whole maze with M4 on it), and four drones and two rovers to task |
+| 07 | TII · Swarm Control | Bird-inspired flocking from seven nearest neighbours, coloured by heading; switch rules off, chase them, or see one drone's view; −74% CPU and −52% bandwidth painted on the floor |
+| 08 | TII · Orchestration | Three rovers, a behavior tree each, an orchestrator, and the trees on the wall lit by what each node returned |
+| 09 | TII · Plan & Track | A field M4 planning through a costmap of rocks and tracking the path with pure pursuit, Stanley or a sampling MPC; the cross-track error on the wall |
+| 10 | Unchained Labs | An intent → agents → jobs graph with pulses running along it |
+| 11 | SIRB.AI | A swarm on a mesh radio you can jam and break, and the self-healing agent on the wall explaining what it does about it |
+| 12 | Projects | The eight project clips on screens; the one you stand at plays |
+| 13 | Off the clock | His photos, printed and scattered on the floor (click one) |
+| 14 | Exit | A finish line, a mailbox, and how to reach him |
 
 ## M4 and its planner
 
@@ -97,8 +100,11 @@ before the robot sets off. Every room is a chapter of his career, and walking
 | -- | -- | -- | -- |
 | Blocks world | Centrale | active | **Solve with PDDL**: plan, drive to the table, pick and place. **New goal**: random towers |
 | Trolley | Coalescent | active | **Dock under** (LiDAR + ICP, or camera), then **carry** and **put down**; or **hook the handle** and **drag** |
-| MAPF swarm | TII | passive | The six robots replan around M4 and ring it |
-| Flock | SIRB.AI | passive | Thirty drones escort M4 on a mesh radio; **jam** it, **fail a drone**, **short range**, **bring them back** |
+| C2 console | TII · C2 | active | **Survey sector B**, **Escort M4**, **Hold the perimeter**, **Return to base**; a unit low on battery goes home on its own |
+| Flocking | TII · Swarm | passive | **M4 is a predator**, **Follow M4**, switch **separation / alignment / cohesion**, **Show one drone's view** |
+| Behavior trees | TII · Orchestration | active | **Raise an anomaly**, **Drain a battery** (it hands its task back), **Block the middle** (they replan) |
+| Field M4 | TII · Plan & Track | active | **Drop a rock in its way**, switch **controller**, **Wind gusts**; or park M4 in its way and it plans round you |
+| Swarm | SIRB.AI | passive | Thirty drones escort M4 on a mesh radio; **jam** it, **fail a drone**, **short range**, **bring them back**; the agent on the wall narrates |
 | Pendulum | Centrale | passive | Balances by itself |
 
 - **M4's kit** (`src/maze/m4.ts`): an RGB-D camera on the nose (the first-person
@@ -140,6 +146,25 @@ before the robot sets off. Every room is a chapter of his career, and walking
   - Each dock reports its error against where the trolley really is. Parked,
     the trolley's cell is an obstacle; carried, it isn't; both costmap layers
     and the baked floor shadow are rebuilt when it moves.
+- **The TII rooms** (`src/maze/tii.ts`):
+  - **C2**: units fly or drive routes per mission (lawnmower lanes over sector B, a patrol loop that goes
+    round the table, stations on the perimeter, an escort ring on M4), drain and recharge batteries, and
+    report to a table map and three wall screens drawn on canvases a few times a second.
+  - **Swarm control**: each drone's acceleration is separation, alignment and cohesion from its seven
+    nearest neighbours (topological, as starlings do), plus a migration goal, altitude hold, walls,
+    pillars and, if you ask, fear of M4. Speeds stay between a minimum and a maximum: birds don't hover.
+    Polarization (how aligned the velocities are) and the number of flocks are measured live.
+  - **Orchestration**: a real behavior-tree engine (sequence, fallback, conditions, actions) ticked at
+    5 Hz per robot, plus an orchestrator tree that dispatches anomalies to the nearest free robot. Robots
+    move on the room's grid by A*, wait for each other, and replan round barriers; a robot sent to charge
+    hands its task back. The wall shows every node's last status.
+  - **Plan & track**: a 0.25-cell costmap of the rocks (lethal plus exponential inflation), 8-connected A*
+    weighted by cost, a smoothed path, and a unicycle model tracked by pure pursuit, Stanley, or a
+    sampling MPC (seventeen steering commands rolled out one second ahead, scored on path distance and
+    the costmap). Wind adds a lateral disturbance; M4 standing in the field is an obstacle too.
+- **The self-healing agent** (SIRB): it watches heartbeats, links and motors, and for each fault logs
+  what it noticed, the cause it infers, the action, and how long recovery took, with a readiness score
+  from the drones flying, λ₂ and whether the swarm is one group.
 - **The swarm's radio** (`src/maze/swarm.ts`): drones link to the drones in
   radio range; jamming and failures cut links. Union-find gives the groups;
   power iteration on the graph Laplacian gives λ₂, the algebraic connectivity.
@@ -198,7 +223,7 @@ Run with `?perf` to see the per-frame cost.
 ## Structure
 
 ```
-index.html              all the content (12 rooms)
+index.html              all the content (15 rooms)
 src/main.ts             story panel, map, scroll/keys/swipe, list view, photo viewer, lazy-loads the world
 src/styles.css          the design system: table, paper, kraft, one red, one blue
 src/media.ts            the project clips and photos used by the 3D rooms
@@ -215,12 +240,13 @@ src/maze/tasks.ts       active interactions: PDDL plans and docking compiled int
 src/maze/sensors.ts     object detector with tracks, the camera's view fan, the first-person HUD, depth shader
 src/maze/dock.ts        trolley perception: LiDAR scan, ICP, ground-plane camera pose, and how they're drawn
 src/maze/swarm.ts       the swarm's radio network: links, groups, λ₂
+src/maze/tii.ts         the four TII rooms: C2, swarm control, behavior trees, plan and track
+src/maze/kit.ts         shared room parts: primitives, glow, detections, floor paint, wall screens
 src/maze/drive.ts       differential-drive kinematics + pure pursuit
-src/maze/mapf.ts        prioritized space-time A* for the swarm room
 src/maze/world.ts       renderer, views, sensors, input, hover cards, planning, preview, tour, sleep
 src/maze/floor.ts       floor shader, baked light, search texture, costmap window
 src/maze/walls.ts       the walls
-src/maze/robot.ts       the small robots in the swarm room
+src/maze/robot.ts       the small robot solving the Coimbra maze
 src/maze/fx.ts          dotted route (rolling and flying), tyre tracks, LiDAR returns
 src/maze/props.ts       the rooms' props and floor paint
 public/work/            project clips (960px, 30 s loops) and posters
