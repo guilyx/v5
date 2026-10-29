@@ -54,7 +54,7 @@ Abu Dhabi sun.
 | | Room | What's in it |
 | -- | -- | -- |
 | 00 | Entrance | His name painted on the floor, the brand mark, a charging dock |
-| 01 | Nantes | A resistor, a capacitor and a breadboard |
+| 01 | Nantes | An RC filter on a breadboard, a function generator and a scope with the Bode plot and the Fourier series; on the workbench, an FPGA chronometer and its logic on a monitor |
 | 02 | Hiventive | The room is the chip: graphite package, gold pins, the STM32's die on the floor, wired to a weather station it runs (SPI, GPIO, UART, CAN) and a logic analyser that decodes the buses |
 | 03 | Coimbra | A small maze on a table that a small robot keeps solving, and two trophies: mapped, unmapped |
 | 04 | Centrale Nantes | The two papers on easels, an inverted pendulum balancing, a MAPF warehouse (logistics robots replanned together by CBS), and a blocks-world table: a PDDL planner, and M4's arm carries out the plan |
@@ -114,6 +114,8 @@ Abu Dhabi sun.
 
 | Object | Room | Kind | What happens |
 | -- | -- | -- | -- |
+| FPGA chronometer | Nantes | active | **Start / Stop** (KEY0), **Lap** (KEY1), **Reset** (KEY2), **Switch the debouncer off** (every bounce becomes an edge) |
+| RC filter | Nantes | active | **Frequency** (100 Hz to 10 kHz), **Sine / square / triangle**, **Sweep**: the traces, the Bode marker and the harmonics follow |
 | Weather station | Hiventive | active | **Heatwave / storm / calm**, **Press B1** (°C ⇄ °F), **Probe** SPI, the UART, CAN or GPIO, **Unplug the CAN node** (no ACK: the error counter climbs to error passive) |
 | MAPF warehouse | Centrale | active | **Rush hour** (new jobs for every robot), **Switch to prioritized / CBS**, **Add a robot** |
 | Blocks world | Centrale | active | **Solve with PDDL**: plan, drive to the table, pick and place. **New goal**: random towers |
@@ -165,6 +167,16 @@ Abu Dhabi sun.
   - Each dock reports its error against where the trolley really is. Parked,
     the trolley's cell is an obstacle; carried, it isn't; both costmap layers
     and the baked floor shadow are rebuilt when it moves.
+- **The FPGA chronometer** (`src/maze/fpga.ts`): a 50 MHz clock divided by 500 000 into a 100 Hz
+  tick, cascaded BCD counters (hundredths, seconds, minutes), a state machine (idle, run, stop, lap),
+  a debouncer per key (1 kHz sampling, ten equal samples in a row), and six seven-segment digits
+  driven active low and scanned at 1 kHz. A press bounces two to four times; with the debouncer the
+  logic sees one edge, without it every falling edge, so a start can stop itself. The monitor behind
+  the board draws the blocks with their live values and the last press as the pin saw it.
+- **The RC bench** (`src/maze/rc.ts`): 1.6 kΩ and 100 nF, a cut-off at 995 Hz. Sine gain and phase
+  come from H(jω) = 1 / (1 + jωRC); square and triangle waves are integrated exactly over small steps
+  until steady state. The scope shows both ends, the Bode plot with the generator's frequency on it,
+  and the first nine harmonics in and out.
 - **The STM32 weather station** (`src/maze/stm32.ts`, `src/maze/hiventive.ts`): the peripherals are
   models and the sensors are models of their datasheets. The BME280 driver writes ctrl_hum and
   ctrl_meas (forced mode) and burst-reads 0xF7..0xFE over SPI (bit 7 of the address: read or write),
@@ -281,6 +293,9 @@ src/maze/tasks.ts       active interactions: PDDL plans and docking compiled int
 src/maze/sensors.ts     object detector with tracks, the camera's view fan, the first-person HUD, depth shader
 src/maze/dock.ts        trolley perception: LiDAR scan, ICP, ground-plane camera pose, and how they're drawn
 src/maze/swarm.ts       the swarm's radio network: links, groups, λ₂
+src/maze/fpga.ts        the FPGA chronometer: prescaler, BCD counters, state machine, debouncer, seven segments
+src/maze/rc.ts          the RC low-pass: transfer function, Fourier series, steady-state traces
+src/maze/nantes.ts      the electronics room: the bench and scope, the FPGA board and its RTL monitor
 src/maze/stm32.ts       the virtual STM32's weather station: BME280 over SPI, GPIO, UART, CAN frames and errors
 src/maze/hiventive.ts   the chip room: die, copper, weather mast, CAN node, terminal, logic analyser
 src/maze/mapf.ts        multi-agent pathfinding: CBS and prioritized planning

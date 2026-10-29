@@ -77,9 +77,10 @@ export const ROOMS: RoomDef[] = [
     tint: "#f1e3c8", ink: "#8a5a2b", anchor: [2, 4], label: [0.5, 1.15],
   },
   {
-    id: "nantes", name: "Nantes", short: "Nantes", sub: "2014–2018 · ELECTRONICS", x: 17, y: 3, w: 7, h: 7,
-    tint: "#cfe2e6", ink: "#2f6370", anchor: [3, 4], label: [0.4, 6.1],
-    blocks: [[1, 1, 3, 1], [5, 1, 1, 1]],
+    id: "nantes", name: "Nantes", short: "Nantes", sub: "2014–2018 · ELECTRONICS", x: 15, y: 3, w: 9, h: 11,
+    tint: "#cfe2e6", ink: "#2f6370", anchor: [1, 9], label: [0.5, 10.1],
+    // the scope and the generator on the north wall, the RC filter, the workbench with the FPGA board
+    blocks: [[0, 0, 9, 1], [1, 2, 3, 1], [5, 2, 1, 1], [2, 5, 5, 4]],
   },
   {
     id: "hiventive", name: "Hiventive", short: "Hiventive", sub: "2018–2019 · BORDEAUX", x: 27, y: 3, w: 11, h: 11,

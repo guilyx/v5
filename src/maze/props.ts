@@ -12,6 +12,7 @@ import { RANGE, SHORT, SwarmNet } from "./swarm";
 type Cell = [number, number];
 import { c2, orchestration, planTrack, swarmControl } from "./tii";
 import { hiventive } from "./hiventive";
+import { nantes } from "./nantes";
 import { warehouse } from "./warehouse";
 import { backroom } from "./cmr";
 import { flamingoGeometry, lanterns, mangrove, palm, parasol, shrub } from "./outdoor";
@@ -222,67 +223,6 @@ function start(ctx: Ctx, r: RoomDef): Fx {
   const g = new THREE.Group();
   g.add(kit.mesh());
   return { room: 0, group: g };
-}
-
-/* ============================================================== 01 · Nantes, electronics */
-
-function nantes(ctx: Ctx, r: RoomDef): Fx {
-  const kit = new Kit();
-  // a giant resistor lying on the floor, with its colour bands
-  const [rx, rz] = cellAt(r, 2, 1);
-  const y = 0.3;
-  kit.cyl(0.2, 0.2, 1.3, rx, y, rz, "#ead7ae", 24, [0, 0, Math.PI / 2]);
-  for (const s of [-1, 1]) {
-    const cap = new THREE.SphereGeometry(0.24, 20, 12);
-    cap.scale(0.55, 1, 1);
-    cap.translate(rx + s * 0.62, y, rz);
-    kit.add(cap, "#ead7ae");
-    kit.cyl(0.028, 0.028, 0.5, rx + s * 0.95, y, rz, "#9aa0a6", 8, [0, 0, Math.PI / 2]);
-    kit.cyl(0.028, 0.028, y, rx + s * 1.2, y / 2, rz, "#9aa0a6", 8);
-  }
-  ["#7a4a2a", "#1f1f22", "#c8352b", "#c9a23c"].forEach((col, i) => {
-    kit.cyl(0.212, 0.212, 0.1, rx - 0.42 + i * 0.24 + (i === 3 ? 0.12 : 0), y, rz, col, 24, [0, 0, Math.PI / 2]);
-  });
-  // an electrolytic capacitor standing up
-  const [cx, cz] = cellAt(r, 5, 1);
-  kit.cyl(0.3, 0.3, 0.78, cx, 0.5, cz, "#3567a8", 28);
-  kit.cyl(0.29, 0.3, 0.03, cx, 0.9, cz, "#c9ccd2", 28);
-  kit.box(0.08, 0.7, 0.04, cx - 0.12, 0.5, cz + 0.28, "#d5e3f4");
-  kit.cyl(0.025, 0.025, 0.12, cx - 0.1, 0.06, cz, "#9aa0a6", 8);
-  kit.cyl(0.025, 0.025, 0.12, cx + 0.1, 0.06, cz, "#9aa0a6", 8);
-  const g = new THREE.Group();
-  g.add(kit.mesh());
-
-  // a breadboard painted on the floor
-  const bw = 640;
-  const bh = 190;
-  ctx.atlas.queue(
-    bw,
-    bh,
-    (k) => {
-      k.fillStyle = "#fbfaf5";
-      k.globalAlpha = 0.9;
-      roundRect(k, 0, 0, bw, bh, 18);
-      k.fill();
-      k.globalAlpha = 1;
-      k.fillStyle = "#c8352b";
-      k.fillRect(24, 16, bw - 48, 4);
-      k.fillStyle = "#3567a8";
-      k.fillRect(24, bh - 20, bw - 48, 4);
-      k.fillStyle = "#6f7a80";
-      for (let row = 0; row < 5; row++)
-        for (let col = 0; col < 26; col++) {
-          k.fillRect(30 + col * 23, 34 + row * 25, 9, 9);
-        }
-      k.fillStyle = "#b9c4c8";
-      k.fillRect(24, bh / 2 + 22, bw - 48, 3);
-    },
-    (uv) => {
-      const [x, z] = cellAt(r, 3, 3.5);
-      ctx.decals.push(quad(x, 0.004, z, 5.4, (5.4 * bh) / bw, uv));
-    },
-  );
-  return { room: 1, group: g };
 }
 
 /* ============================================================== 03 · Coimbra, a maze in the maze */

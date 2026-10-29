@@ -223,9 +223,40 @@
         <div class="room-body">
           <p>
             Before robots, circuits. Four years of electronics engineering in Nantes, the city I came back to a year later
-            for a master's in control and robotics.
+            for a master's in control and robotics: circuits and signals, the maths under them (Laplace, Fourier, transfer
+            functions, Bode plots), and digital logic all the way down to FPGAs.
           </p>
-          <p class="aside">The parts on this floor belong to that chapter: a resistor, a capacitor and a breadboard, toy-sized.</p>
+          <p>The project I liked most: a chronometer on an FPGA.</p>
+          <section class="try maze-only" data-ix="chrono" aria-labelledby="try-chrono">
+            <div class="try-head">
+              <h3 id="try-chrono">Try it: the FPGA chronometer</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              The 50 MHz clock is divided down to a 100 Hz tick, cascaded BCD counters keep hundredths, seconds and
+              minutes, a state machine handles start, stop, lap and reset, and six seven-segment digits are scanned one at
+              a time. The monitor behind the board shows the logic as it runs.
+            </p>
+            <p>
+              Switch the debouncer off and press a few times: a button bounces for a few milliseconds, and without the
+              filter every bounce is an edge.
+            </p>
+            <div class="try-actions"></div>
+            <figure class="try-live-wrap"><figcaption>the signals, live</figcaption><pre class="try-live"></pre></figure>
+          </section>
+          <section class="try maze-only" data-ix="bench" aria-labelledby="try-bench">
+            <div class="try-head">
+              <h3 id="try-bench">Try it: an RC filter on the scope</h3>
+              <span class="chip chip-active">Active</span>
+            </div>
+            <p>
+              The resistor and the capacitor on the floor make a low-pass filter, H(jω) = 1 / (1 + jωRC), with its cut-off
+              at 995 Hz. The scope shows what goes in and what comes out, beside the Bode plot and the Fourier series: a
+              square wave is its odd harmonics, and the filter keeps the low ones.
+            </p>
+            <div class="try-actions"></div>
+            <figure class="try-live-wrap"><figcaption>the maths, live</figcaption><pre class="try-live"></pre></figure>
+          </section>
         </div>
       </article>
 
